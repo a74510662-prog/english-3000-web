@@ -358,6 +358,17 @@ function tryStartQuiz() {
 }
 
 function renderQuestion() {
+  // 三叉戟：中毒扣血
+  if (battleState.poisoned && battleState.hp > 0) {
+    battleState.poisoned = false;
+    battleState.hp = Math.max(0, battleState.hp - 1);
+    updateMonsterHP();
+    showDamageNumber(1, false, "#0984e3");
+    if (battleState.hp <= 0) {
+      const monsterEl = document.getElementById("monster-char");
+      if (monsterEl) handleMonsterDeath(monsterEl);
+    }
+  }
   const q = state.quiz.questions[state.quiz.idx];
   const distractorPool = state.quiz.pool.length >= 4 ? state.quiz.pool : wordsPool;
   const wrongs = shuffle(distractorPool.filter(w => w.word !== q.word)).slice(0, 3);
@@ -399,7 +410,10 @@ function renderQuestion() {
 
 function answerQuestion(btn, isCorrect, q) {
   const elapsed = questionStartTime ? Date.now() - questionStartTime : 99999;
-  const isCritical = isCorrect && elapsed <= CRITICAL_MS;
+  const weaponType = getEquippedWeaponItem()?.type;
+  // 火焰劍：額外 15% 爆擊機率
+  const fireCrit = weaponType === "fire" && isCorrect && Math.random() < 0.15;
+  const isCritical = isCorrect && (elapsed <= CRITICAL_MS || fireCrit);
   stopQuestionTimer();
 
   document.querySelectorAll("#quiz-options button").forEach(b => {
@@ -411,14 +425,50 @@ function answerQuestion(btn, isCorrect, q) {
   if (isCorrect) {
     state.quiz.correct++;
     progress.quizCorrect++;
-    fb.textContent = isCritical ? "⚡ 爆擊！答對了！" : "✓ 答對了!";
+    // 龍魂聖劍：每 5 題治癒 1HP
+    battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
+    if (weaponType === "holy" && battleState.consecutiveCorrect % 5 === 0) {
+      healPlayer(1);
+      showBattleEffect("💎+1HP", "#f4a261");
+    }
+    // 三叉戟：答對後中毒
+    if (weaponType === "trident") {
+      battleState.poisoned = true;
+      showBattleEffect("💧中毒", "#0984e3");
+    }
+    // 冰霜杖：答對凍結計時 5 秒
+    if (weaponType === "ice") {
+      extendTimer(5000);
+      showBattleEffect("❄️凍結+5s", "#74b9ff");
+    }
+    // 戰錘：爆擊時延長計時 3 秒
+    if (weaponType === "hammer" && isCritical) {
+      extendTimer(3000);
+      showBattleEffect("⚒️震盪+3s", "#636e72");
+    }
+    fb.textContent = isCritical ? (fireCrit ? "🔥 燃燒爆擊！答對了！" : "⚡ 爆擊！答對了！") : "✓ 答對了!";
     fb.className = "quiz-feedback ok";
     triggerAttack(isCritical);
   } else {
+    battleState.consecutiveCorrect = 0;
     progress.quizWrong++;
     fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
     fb.className = "quiz-feedback no";
     triggerMonsterAttack();
+    // 迴旋鏢：答錯仍造成 1 傷害
+    if (weaponType === "boomerang") {
+      setTimeout(() => {
+        if (battleState.hp <= 0) return;
+        battleState.hp = Math.max(0, battleState.hp - 1);
+        updateMonsterHP();
+        showDamageNumber(1, false, "#e17055");
+        showBattleEffect("🪃返回打擊", "#e17055");
+        if (battleState.hp <= 0) {
+          const monsterEl = document.getElementById("monster-char");
+          if (monsterEl) handleMonsterDeath(monsterEl);
+        }
+      }, 700);
+    }
   }
   saveProgress(progress);
   fb.classList.remove("hidden");
@@ -534,17 +584,17 @@ const MONSTERS = ["👹", "🐉", "💀", "🧟", "👾", "🦇", "🐺", "🧌"
 const AVATARS = ["🧙","🧝","🦸","🧜","🧚","🧞","🦊","🐱","🐶","🐼","🦁","🐯","🐸","🐧","🐺","🦅"];
 
 const WEAPON_TYPES = [
-  { key: "dagger",    name: "匕首",     emoji: "🗡️",  hit: ["⚔️"],        color: "#b2bec3" },
-  { key: "bow",       name: "弓箭",     emoji: "🏹",  hit: ["🏹"],        color: "#00b894", projectile: true,  projEmoji: "➤" },
-  { key: "staff",     name: "魔法杖",   emoji: "🪄",  hit: ["✨", "💫"],  color: "#a29bfe" },
-  { key: "boomerang", name: "迴旋鏢",   emoji: "🪃",  hit: ["🪃", "💥"],  color: "#e17055", projectile: true,  projEmoji: "🪃" },
-  { key: "hammer",    name: "戰錘",     emoji: "⚒️",  hit: ["💢", "💥"],  color: "#636e72" },
-  { key: "trident",   name: "三叉戟",   emoji: "🔱",  hit: ["🔱", "💧"],  color: "#0984e3" },
-  { key: "fire",      name: "火焰劍",   emoji: "🔥",  hit: ["🔥", "💥"],  color: "#d63031" },
-  { key: "ice",       name: "冰霜杖",   emoji: "❄️",  hit: ["❄️", "💫"],  color: "#74b9ff" },
-  { key: "thunder",   name: "雷霆錘",   emoji: "⚡",  hit: ["⚡", "💥"],  color: "#fdcb6e" },
-  { key: "dark",      name: "暗黑之刃", emoji: "🌙",  hit: ["🌑", "💀"],  color: "#6c5ce7" },
-  { key: "holy",      name: "龍魂聖劍", emoji: "💎",  hit: ["✨", "💎"],  color: "#f4a261" },
+  { key: "dagger",    name: "匕首",     emoji: "🗡️",  hit: ["⚔️"],        color: "#b2bec3", special: "⚡速攻：25% 機率追加 -1 攻擊" },
+  { key: "bow",       name: "弓箭",     emoji: "🏹",  hit: ["🏹"],        color: "#00b894", projectile: true,  projEmoji: "➤",  special: "🏹穿透：答對額外 +1 傷害" },
+  { key: "staff",     name: "魔法杖",   emoji: "🪄",  hit: ["✨", "💫"],  color: "#a29bfe", special: "✨魔力回復：擊殺怪物後計時 +4 秒" },
+  { key: "boomerang", name: "迴旋鏢",   emoji: "🪃",  hit: ["🪃", "💥"],  color: "#e17055", projectile: true,  projEmoji: "🪃",  special: "🪃返回打擊：答錯仍造成 1 傷害" },
+  { key: "hammer",    name: "戰錘",     emoji: "⚒️",  hit: ["💢", "💥"],  color: "#636e72", special: "⚒️震盪：爆擊時計時 +3 秒" },
+  { key: "trident",   name: "三叉戟",   emoji: "🔱",  hit: ["🔱", "💧"],  color: "#0984e3", special: "💧海神之毒：答對使怪物中毒，下題 -1HP" },
+  { key: "fire",      name: "火焰劍",   emoji: "🔥",  hit: ["🔥", "💥"],  color: "#d63031", special: "🔥燃燒：爆擊機率額外 +15%" },
+  { key: "ice",       name: "冰霜杖",   emoji: "❄️",  hit: ["❄️", "💫"],  color: "#74b9ff", special: "❄️凍結：答對後計時停止 5 秒" },
+  { key: "thunder",   name: "雷霆錘",   emoji: "⚡",  hit: ["⚡", "💥"],  color: "#fdcb6e", special: "⚡連鎖閃電：爆擊追加 +2 傷害" },
+  { key: "dark",      name: "暗黑之刃", emoji: "🌙",  hit: ["🌑", "💀"],  color: "#6c5ce7", special: "🌙吸血：擊殺怪物後回復 1HP" },
+  { key: "holy",      name: "龍魂聖劍", emoji: "💎",  hit: ["✨", "💎"],  color: "#f4a261", special: "💎神聖庇護：每 5 題答對自動治癒 1HP" },
 ];
 
 const STAGE_WEAPON_POOLS = [
@@ -591,13 +641,13 @@ function getEquippedWeaponItem() {
   return (progress.char.weaponInventory || []).find(x => x.type === progress.char.equippedWeapon) || null;
 }
 
-let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0 };
+let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, consecutiveCorrect: 0 };
 let questionStartTime = null;
 let timerInterval = null;
 
 function initBattle() {
   const mHp = getMonsterMaxHp();
-  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0 };
+  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, consecutiveCorrect: 0 };
   const mChar = document.getElementById("monster-char");
   if (mChar) { mChar.textContent = MONSTERS[0]; mChar.className = "battle-char"; }
   const pChar = document.getElementById("player-char");
@@ -848,6 +898,46 @@ function shakeArena(isCritical) {
   setTimeout(() => arena.classList.remove("shaking", "shaking-big"), 520);
 }
 
+function extendTimer(ms) {
+  if (questionStartTime !== null) questionStartTime += ms;
+}
+
+function healPlayer(amount) {
+  const maxHp = getPlayerMaxHp();
+  if (battleState.playerHp >= maxHp) return;
+  battleState.playerHp = Math.min(battleState.playerHp + amount, maxHp);
+  updatePlayerHP();
+}
+
+function showBattleEffect(text, color) {
+  const arena = document.getElementById("battle-arena");
+  if (!arena) return;
+  const el = document.createElement("div");
+  el.className = "battle-effect-text";
+  el.textContent = text;
+  el.style.color = color || "#fff";
+  el.style.left = (18 + Math.random() * 40) + "%";
+  el.style.top  = (12 + Math.random() * 40) + "%";
+  arena.appendChild(el);
+  setTimeout(() => el.remove(), 1400);
+}
+
+function handleMonsterDeath(monsterEl) {
+  monsterEl.classList.add("dying");
+  playMonsterDeathSfx();
+  setTimeout(() => {
+    onMonsterKilled();
+    battleState.monsterIdx = (battleState.monsterIdx + 1) % MONSTERS.length;
+    const newMHp = getMonsterMaxHp();
+    battleState.monsterMaxHp = newMHp;
+    battleState.hp = newMHp;
+    monsterEl.textContent = MONSTERS[battleState.monsterIdx];
+    monsterEl.className = "battle-char appearing";
+    updateMonsterHP();
+    setTimeout(() => monsterEl.classList.remove("appearing"), 500);
+  }, 650);
+}
+
 function triggerAttack(isCritical) {
   const playerEl = document.getElementById("player-char");
   const monsterEl = document.getElementById("monster-char");
@@ -888,7 +978,14 @@ function triggerAttack(isCritical) {
       setTimeout(() => flash.remove(), 400);
     }
     const atk = getPlayerAttack();
-    const dmg = isCritical ? atk * 2 : atk;
+    let dmg = isCritical ? atk * 2 : atk;
+    // 弓箭：穿透 +1
+    if (wt.key === "bow") dmg += 1;
+    // 雷霆錘：連鎖閃電爆擊 +2
+    if (wt.key === "thunder" && isCritical) {
+      dmg += 2;
+      showBattleEffect("⚡連鎖", wt.color);
+    }
     if (isCritical && critEl) {
       critEl.textContent = `CRITICAL!! -${dmg}HP`;
       critEl.classList.remove("crit-anim");
@@ -909,19 +1006,19 @@ function triggerAttack(isCritical) {
       monsterEl.classList.remove("hit");
       playerEl.classList.remove("attacking");
       if (battleState.hp <= 0) {
-        monsterEl.classList.add("dying");
-        playMonsterDeathSfx();
+        handleMonsterDeath(monsterEl);
+        return;
+      }
+      // 匕首：速攻 25% 機率追加 -1
+      if (wt.key === "dagger" && Math.random() < 0.25) {
         setTimeout(() => {
-          onMonsterKilled();
-          battleState.monsterIdx = (battleState.monsterIdx + 1) % MONSTERS.length;
-          const newMHp = getMonsterMaxHp();
-          battleState.monsterMaxHp = newMHp;
-          battleState.hp = newMHp;
-          monsterEl.textContent = MONSTERS[battleState.monsterIdx];
-          monsterEl.className = "battle-char appearing";
+          if (battleState.hp <= 0) return;
+          battleState.hp = Math.max(0, battleState.hp - 1);
           updateMonsterHP();
-          setTimeout(() => monsterEl.classList.remove("appearing"), 500);
-        }, 650);
+          showDamageNumber(1, false, wt.color);
+          showBattleEffect("🗡️速攻", wt.color);
+          if (battleState.hp <= 0) handleMonsterDeath(monsterEl);
+        }, 220);
       }
     }, 550);
   }, 280);
@@ -1112,6 +1209,17 @@ function usePotion() {
 
 function onMonsterKilled() {
   battleState.sessionMonstersKilled = (battleState.sessionMonstersKilled || 0) + 1;
+  const weaponType = getEquippedWeaponItem()?.type;
+  // 暗黑之刃：吸血回復 1HP
+  if (weaponType === "dark") {
+    healPlayer(1);
+    showBattleEffect("🌙吸血+1HP", "#6c5ce7");
+  }
+  // 魔法杖：擊殺後計時 +4 秒
+  if (weaponType === "staff") {
+    extendTimer(4000);
+    showBattleEffect("✨魔力+4s", "#a29bfe");
+  }
   if (battleState.sessionMonstersKilled >= 3) {
     ensureDailyTasks(); ensureChar();
     const bonusKey = state.quiz.mode === "en-to-zh" ? "bonusKillsEnToZh" : "bonusKillsZhToEn";
@@ -1198,6 +1306,7 @@ function renderWeaponInventory() {
       <div class="weapon-item-info">
         <div class="weapon-item-name">${wt.name} +${w.attack}${lvTag}</div>
         <div class="weapon-item-sub">升級進度 ${w.count}/10・實際傷害 +${w.attack + (w.level || 0)}</div>
+        <div class="weapon-item-special">${wt.special || ""}</div>
       </div>
       <div class="weapon-item-action">
         ${isEquipped

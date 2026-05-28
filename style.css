@@ -742,6 +742,23 @@ body {
   100% { left: 72%; opacity: 0.2; }
 }
 
+/* 武器特殊效果浮動文字 */
+.battle-effect-text {
+  position: absolute;
+  font-size: 0.8rem;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 25;
+  white-space: nowrap;
+  text-shadow: 0 1px 5px rgba(0,0,0,0.9);
+  animation: battle-effect-rise 1.4s ease-out forwards;
+}
+@keyframes battle-effect-rise {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  55%  { opacity: 1; transform: translateY(-30px) scale(1.08); }
+  100% { opacity: 0; transform: translateY(-54px) scale(0.88); }
+}
+
 .battle-chest-bonus {
   position: absolute;
   top: 50%;
@@ -781,6 +798,7 @@ body {
 .weapon-item-info { flex: 1; min-width: 0; }
 .weapon-item-name { font-size: 0.88rem; font-weight: 600; }
 .weapon-item-sub { font-size: 0.75rem; color: var(--text-light); margin-top: 2px; }
+.weapon-item-special { font-size: 0.72rem; color: var(--primary); margin-top: 3px; opacity: 0.85; }
 .weapon-lv-tag { color: var(--accent); font-size: 0.78rem; font-weight: 700; }
 .weapon-item-action { flex-shrink: 0; }
 .weapon-badge { font-size: 0.72rem; color: var(--accent); font-weight: 700; }
