@@ -117,6 +117,8 @@ function loadProgress() {
     if (p.char.equippedWeapon === undefined) p.char.equippedWeapon = null;
     if (p.char.coins === undefined) p.char.coins = 0;
     if (p.char.rainbowTickets === undefined) p.char.rainbowTickets = 0;
+    if (!p.wishes) p.wishes = ["", "", "", "", ""];
+    if (!p.wishesClaimed) p.wishesClaimed = [false, false, false, false, false];
     // 重新計算 HP（新級距：每 12 級 +1，舊為每 5 級 +1）
     p.char.maxHp = 3 + Math.floor((p.char.level || 1) / 12);
     if (!p.dailyTasks) p.dailyTasks = { date: "", enToZhDone: false, zhToEnDone: false };
@@ -136,6 +138,8 @@ function newProgress() {
     quizWrong: 0,
     shuffleOffset: 0,
     char: { level: 1, exp: 0, maxHp: 3, equippedWeapon: null, weaponInventory: [], potions: 0, chests: 0, coins: 0, rainbowTickets: 0, avatar: "🧙" },
+    wishes: ["", "", "", "", ""],
+    wishesClaimed: [false, false, false, false, false],
     dailyTasks: { date: "", enToZhDone: false, zhToEnDone: false },
     lastLoginDate: ""
   };
@@ -1331,6 +1335,89 @@ function giveLevelUpWeapons() {
   showChestModal("🆙", `升級獎勵！獲得 ${wt.emoji}${wt.name} 碎片 ×2${upgradeText}`);
 }
 
+const WISH_REWARDS = [
+  { title: "初心英雄", badge: "🌱", cost: 50   },
+  { title: "單字勇者", badge: "⚔️", cost: 150  },
+  { title: "知識騎士", badge: "🛡️", cost: 350  },
+  { title: "語言大師", badge: "🎓", cost: 700  },
+  { title: "傳說學者", badge: "👑", cost: 1200 },
+];
+
+function renderWishRewards() {
+  const container = document.getElementById("shop-wish-list");
+  if (!container) return;
+  const learned   = (progress.learnedIds || []).length;
+  const is3000    = learned >= 3000;
+  const tickets   = (progress.char && progress.char.rainbowTickets) || 0;
+  const wishes    = progress.wishes  || ["", "", "", "", ""];
+  const claimed   = progress.wishesClaimed || [false, false, false, false, false];
+  container.innerHTML = "";
+  if (!is3000) {
+    const note = document.createElement("div");
+    note.className = "shop-wish-lock-note";
+    note.textContent = `🔒 目前熟記 ${learned} / 3000 字，全部完成後解鎖`;
+    container.appendChild(note);
+  }
+  WISH_REWARDS.forEach((w, i) => {
+    const isClaimed  = claimed[i];
+    const wishText   = wishes[i] || "";
+    const canRedeem  = is3000 && tickets >= w.cost && !isClaimed && wishText.trim().length > 0;
+    const card = document.createElement("div");
+    card.className = "shop-item-card shop-wish-card" + (isClaimed ? " wish-claimed" : "");
+    card.innerHTML = `
+      <div class="shop-item-icon">${w.badge}</div>
+      <div class="shop-item-info wish-info">
+        <div class="shop-item-name">${w.title}</div>
+        <div class="shop-wish-cost">🌈 ${w.cost} 張</div>
+        ${isClaimed
+          ? `<div class="shop-wish-text-done">✅ ${wishText || "願望已達成"}</div>`
+          : `<textarea class="shop-wish-input" id="wish-input-${i}" maxlength="40"
+               placeholder="${is3000 ? "寫下你的願望..." : "熟記 3000 字後解鎖"}"
+               ${is3000 ? "" : "disabled"}>${wishText}</textarea>`
+        }
+      </div>
+      <div class="shop-item-action">
+        ${isClaimed
+          ? `<span class="shop-wish-done-badge">已達成</span>`
+          : `<button class="shop-buy-btn shop-buy-rainbow shop-wish-btn"
+               data-wish="${i}" ${canRedeem ? "" : "disabled"}>兌換</button>`
+        }
+      </div>`;
+    if (!isClaimed) {
+      const ta  = card.querySelector(`#wish-input-${i}`);
+      const btn = card.querySelector(".shop-wish-btn");
+      if (ta) ta.addEventListener("input", () => {
+        if (!progress.wishes) progress.wishes = ["", "", "", "", ""];
+        progress.wishes[i] = ta.value;
+        saveProgress(progress);
+        if (btn) btn.disabled = !(is3000 && tickets >= w.cost && ta.value.trim().length > 0);
+      });
+      if (btn) btn.addEventListener("click", () => redeemWish(i));
+    }
+    container.appendChild(card);
+  });
+}
+
+function redeemWish(index) {
+  ensureChar();
+  const w       = WISH_REWARDS[index];
+  const tickets = progress.char.rainbowTickets || 0;
+  const wishes  = progress.wishes  || ["", "", "", "", ""];
+  const claimed = progress.wishesClaimed || [false, false, false, false, false];
+  if ((progress.learnedIds || []).length < 3000) { alert("需要熟記 3000 字才能兌換！"); return; }
+  if (claimed[index]) { alert("此願望已兌換！"); return; }
+  if (tickets < w.cost) { alert(`彩虹券不足！需要 🌈${w.cost}，目前 🌈${tickets}`); return; }
+  if (!wishes[index] || !wishes[index].trim()) { alert("請先寫下你的願望！"); return; }
+  progress.char.rainbowTickets -= w.cost;
+  progress.wishesClaimed[index] = true;
+  saveProgress(progress);
+  renderShop();
+  showChestModal(w.badge,
+    `🎉 恭喜達成「${w.title}」！<br>` +
+    `<span style="color:#f4a261;font-size:1rem">${wishes[index]}</span><br>` +
+    `<span style="font-size:0.8rem;color:var(--text-light)">願望已兌換，繼續努力！</span>`);
+}
+
 function renderShop() {
   const coins = (progress.char && progress.char.coins) || 0;
   const tickets = (progress.char && progress.char.rainbowTickets) || 0;
@@ -1339,6 +1426,7 @@ function renderShop() {
   if (shopCoins) shopCoins.textContent = coins;
   const shopRainbow = document.getElementById("shop-rainbow-val");
   if (shopRainbow) shopRainbow.textContent = tickets;
+  renderWishRewards();
 }
 
 function buyItem(item, cost) {
