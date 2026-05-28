@@ -1258,7 +1258,7 @@ function showDefeat() {
 }
 
 // === 角色系統 ===
-const EXP_PER_LEVEL = 10;
+const EXP_PER_LEVEL = 6;
 const LEVELS_PER_HP_UP = 12;
 const MAX_LEVEL = 999;
 
