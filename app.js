@@ -1575,11 +1575,11 @@ function onMonsterKilled() {
   // 全字池模式：擊殺巨龍獎勵 100 張彩虹券
   if (state.quiz && state.quiz.range === "all") {
     ensureChar();
-    progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 100;
+    progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 10;
     saveProgress(progress);
-    showBattleEffect("🌈+100", "#a29bfe");
+    showBattleEffect("🌈+10", "#a29bfe");
     setTimeout(() => {
-      showChestModal("🐉", `討伐巨龍成功！<br>獲得 🌈 彩虹券 ×100<br><span style="font-size:0.85rem;color:#ffd700">傳說成就解鎖！</span>`);
+      showChestModal("🐉", `討伐巨龍成功！<br>獲得 🌈 彩虹券 ×10<br><span style="font-size:0.85rem;color:#ffd700">傳說成就解鎖！</span>`);
     }, 1000);
     return;
   }
