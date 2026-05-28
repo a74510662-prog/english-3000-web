@@ -474,7 +474,7 @@ function answerQuestion(btn, isCorrect, q) {
     progress.quizWrong++;
     fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
     fb.className = "quiz-feedback no";
-    triggerMonsterAttack();
+    triggerMonsterAttack(state.quiz.range === "all" ? 13 : undefined);
     // 迴旋鏢：答錯返回打擊（隨等級增加傷害）
     if (weaponType === "boomerang") {
       const bdmg = 1 + wBonus;
