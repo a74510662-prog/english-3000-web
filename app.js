@@ -494,6 +494,31 @@ function answerQuestion(btn, isCorrect, q) {
   document.getElementById("next-question").classList.remove("hidden");
   document.getElementById("q-correct").textContent = state.quiz.correct;
 
+  // 全字池模式：每 4 題巨龍吐火 15HP
+  if (state.quiz.range === "all" && (state.quiz.idx + 1) % 4 === 0) {
+    const isLastQ = (state.quiz.idx + 1) >= state.quiz.questions.length;
+    if (isLastQ) document.getElementById("next-question").classList.add("hidden");
+    const gameEl = document.getElementById("quiz-game");
+    setTimeout(() => {
+      if (battleState.playerHp <= 0) {
+        if (isLastQ) document.getElementById("next-question").classList.remove("hidden");
+        return;
+      }
+      if (!gameEl || gameEl.classList.contains("hidden")) return;
+      showBattleEffect("🔥巨龍吐火！-15", "#ff4500");
+      setTimeout(() => {
+        if (battleState.playerHp <= 0) return;
+        if (!gameEl || gameEl.classList.contains("hidden")) return;
+        triggerMonsterAttack(15);
+        if (isLastQ) {
+          setTimeout(() => {
+            if (battleState.playerHp > 0) document.getElementById("next-question").classList.remove("hidden");
+          }, 1900);
+        }
+      }, 600);
+    }, 1000);
+  }
+
   // 熟記模式：每 5 題怪物自動出手一次
   if (state.quiz.range === "learned" && (state.quiz.idx + 1) % 5 === 0) {
     const isLastQuestion = (state.quiz.idx + 1) >= state.quiz.questions.length;
@@ -1159,7 +1184,7 @@ function triggerAttack(isCritical) {
   }, 280);
 }
 
-function triggerMonsterAttack() {
+function triggerMonsterAttack(overrideDamage) {
   const monsterEl = document.getElementById("monster-char");
   const playerEl = document.getElementById("player-char");
   if (!monsterEl || !playerEl) return;
@@ -1172,7 +1197,7 @@ function triggerMonsterAttack() {
     playerEl.classList.remove("player-hit");
     void playerEl.offsetWidth;
     playerEl.classList.add("player-hit");
-    let monsterDmg = getMonsterAttack();
+    let monsterDmg = overrideDamage !== undefined ? overrideDamage : getMonsterAttack();
     if (battleState.dragonShield > 0) {
       const absorbed = Math.min(battleState.dragonShield, monsterDmg);
       battleState.dragonShield -= absorbed;
@@ -1296,7 +1321,7 @@ function buyItem(item, cost) {
     if (existing) { alert("已擁有巨龍神劍！彩虹券未消耗。"); return; }
     if (tickets < cost) { alert(`彩虹券不足！需要 🌈${cost}，目前 🌈${tickets}`); return; }
     progress.char.rainbowTickets -= cost;
-    inv.push({ type: "dragon_sword", attack: 20, level: 0, count: 0 });
+    inv.push({ type: "dragon_sword", attack: 17, level: 0, count: 0 });
     if (!progress.char.equippedWeapon) progress.char.equippedWeapon = "dragon_sword";
     progress.char.weaponInventory = inv;
     saveProgress(progress);
