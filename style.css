@@ -1098,13 +1098,6 @@ body {
 .wish-claimed { border-color: #a29bfe; background: #f5f3ff; }
 .wish-info { display: flex; flex-direction: column; gap: 4px; }
 .shop-wish-cost { font-size: 0.78rem; color: #6c3fd4; }
-.shop-wish-input {
-  width: 100%; border: 1px solid var(--border); border-radius: 8px;
-  padding: 6px 8px; font-size: 0.82rem; resize: none; height: 52px;
-  font-family: inherit; color: var(--text);
-}
-.shop-wish-input:disabled { background: #f0f0f0; color: var(--text-light); }
-.shop-wish-text-done { font-size: 0.82rem; color: #6c3fd4; margin-top: 2px; }
 .shop-wish-done-badge {
   font-size: 0.75rem; color: #6c3fd4; font-weight: 700;
   border: 1px solid #a29bfe; border-radius: 12px; padding: 4px 8px;

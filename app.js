@@ -1346,11 +1346,10 @@ const WISH_REWARDS = [
 function renderWishRewards() {
   const container = document.getElementById("shop-wish-list");
   if (!container) return;
-  const learned   = (progress.learnedIds || []).length;
-  const is3000    = learned >= 3000;
-  const tickets   = (progress.char && progress.char.rainbowTickets) || 0;
-  const wishes    = progress.wishes  || ["", "", "", "", ""];
-  const claimed   = progress.wishesClaimed || [false, false, false, false, false];
+  const learned = (progress.learnedIds || []).length;
+  const is3000  = learned >= 3000;
+  const tickets = (progress.char && progress.char.rainbowTickets) || 0;
+  const claimed = progress.wishesClaimed || [false, false, false, false, false];
   container.innerHTML = "";
   if (!is3000) {
     const note = document.createElement("div");
@@ -1360,38 +1359,26 @@ function renderWishRewards() {
   }
   WISH_REWARDS.forEach((w, i) => {
     const isClaimed  = claimed[i];
-    const wishText   = wishes[i] || "";
-    const canRedeem  = is3000 && tickets >= w.cost && !isClaimed && wishText.trim().length > 0;
+    const prevClaimed = i === 0 || claimed[i - 1];
+    const canRedeem  = is3000 && tickets >= w.cost && !isClaimed && prevClaimed;
+    const isSeqLocked = is3000 && !prevClaimed;
     const card = document.createElement("div");
     card.className = "shop-item-card shop-wish-card" + (isClaimed ? " wish-claimed" : "");
     card.innerHTML = `
-      <div class="shop-item-icon">${w.badge}</div>
+      <div class="shop-item-icon">${isClaimed ? w.badge : (isSeqLocked ? "🔒" : w.badge)}</div>
       <div class="shop-item-info wish-info">
         <div class="shop-item-name">${w.title}</div>
-        <div class="shop-wish-cost">🌈 ${w.cost} 張</div>
-        ${isClaimed
-          ? `<div class="shop-wish-text-done">✅ ${wishText || "願望已達成"}</div>`
-          : `<textarea class="shop-wish-input" id="wish-input-${i}" maxlength="40"
-               placeholder="${is3000 ? "寫下你的願望..." : "熟記 3000 字後解鎖"}"
-               ${is3000 ? "" : "disabled"}>${wishText}</textarea>`
-        }
+        <div class="shop-wish-cost">🌈 ${w.cost} 張${isSeqLocked ? "・需先解鎖上一個稱號" : ""}</div>
       </div>
       <div class="shop-item-action">
         ${isClaimed
-          ? `<span class="shop-wish-done-badge">已達成</span>`
+          ? `<span class="shop-wish-done-badge">✅ 已獲得</span>`
           : `<button class="shop-buy-btn shop-buy-rainbow shop-wish-btn"
-               data-wish="${i}" ${canRedeem ? "" : "disabled"}>兌換</button>`
+               ${canRedeem ? "" : "disabled"}>兌換</button>`
         }
       </div>`;
     if (!isClaimed) {
-      const ta  = card.querySelector(`#wish-input-${i}`);
       const btn = card.querySelector(".shop-wish-btn");
-      if (ta) ta.addEventListener("input", () => {
-        if (!progress.wishes) progress.wishes = ["", "", "", "", ""];
-        progress.wishes[i] = ta.value;
-        saveProgress(progress);
-        if (btn) btn.disabled = !(is3000 && tickets >= w.cost && ta.value.trim().length > 0);
-      });
       if (btn) btn.addEventListener("click", () => redeemWish(i));
     }
     container.appendChild(card);
@@ -1402,20 +1389,18 @@ function redeemWish(index) {
   ensureChar();
   const w       = WISH_REWARDS[index];
   const tickets = progress.char.rainbowTickets || 0;
-  const wishes  = progress.wishes  || ["", "", "", "", ""];
   const claimed = progress.wishesClaimed || [false, false, false, false, false];
   if ((progress.learnedIds || []).length < 3000) { alert("需要熟記 3000 字才能兌換！"); return; }
-  if (claimed[index]) { alert("此願望已兌換！"); return; }
+  if (index > 0 && !claimed[index - 1]) { alert("請先兌換上一個稱號！"); return; }
+  if (claimed[index]) { alert("此稱號已獲得！"); return; }
   if (tickets < w.cost) { alert(`彩虹券不足！需要 🌈${w.cost}，目前 🌈${tickets}`); return; }
-  if (!wishes[index] || !wishes[index].trim()) { alert("請先寫下你的願望！"); return; }
   progress.char.rainbowTickets -= w.cost;
   progress.wishesClaimed[index] = true;
   saveProgress(progress);
   renderShop();
   showChestModal(w.badge,
-    `🎉 恭喜達成「${w.title}」！<br>` +
-    `<span style="color:#f4a261;font-size:1rem">${wishes[index]}</span><br>` +
-    `<span style="font-size:0.8rem;color:var(--text-light)">願望已兌換，繼續努力！</span>`);
+    `🎉 恭喜獲得稱號「${w.title}」！<br>` +
+    `<span style="font-size:0.85rem;color:var(--text-light)">繼續挑戰下一個稱號</span>`);
 }
 
 function renderShop() {
