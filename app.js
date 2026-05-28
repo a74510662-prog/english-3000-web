@@ -540,9 +540,9 @@ function finishQuiz() {
     }
     chestLine = `<br><span style="color:#f4a261;font-size:0.95rem">💰 擊殺獎勵：+${killCoins} 金幣（${killed} 隻）</span>${perfectBonus}`;
   } else if (chestEarned) {
-    chestLine = `<br><span style="color:#f4a261;font-size:0.95rem">📦 任務達成！獲得寶箱 ×1（本場擊敗 ${killed} 隻怪物）</span>`;
-  } else if (killed < 2) {
-    chestLine = `<br><span style="color:var(--text-light);font-size:0.9rem">本場擊敗 ${killed}/2 隻怪物，未達任務條件</span>`;
+    chestLine = `<br><span style="color:#f4a261;font-size:0.95rem">📦 任務達成！獲得寶箱 ×1（本場全對！）</span>`;
+  } else if (state.quiz.correct < total) {
+    chestLine = `<br><span style="color:var(--text-light);font-size:0.9rem">答對 ${state.quiz.correct}/${total} 題，需全對才達成每日任務</span>`;
   }
   document.getElementById("quiz-score").innerHTML = `
     答對 <strong>${state.quiz.correct}</strong> / ${total} 題 (${pct}%)<br>
@@ -1461,9 +1461,8 @@ function showBattleChestBonus() {
 
 function checkSessionChallenge(mode) {
   if (state.quiz && state.quiz.range === "learned") return false;
-  const pendingKill = battleState.hp <= 0 ? 1 : 0;
-  const totalKilled = (battleState.sessionMonstersKilled || 0) + pendingKill;
-  if (totalKilled < 2) return false;
+  const total = state.quiz.questions.length;
+  if (state.quiz.correct < total) return false;
   ensureChar();
   ensureDailyTasks();
   const key = mode === "en-to-zh" ? "enToZhDone" : "zhToEnDone";
