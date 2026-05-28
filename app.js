@@ -474,7 +474,7 @@ function answerQuestion(btn, isCorrect, q) {
     progress.quizWrong++;
     fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
     fb.className = "quiz-feedback no";
-    triggerMonsterAttack(state.quiz.range === "all" ? 13 : undefined);
+    triggerMonsterAttack(state.quiz.range === "all" ? getDragonDamage() : undefined);
     // 迴旋鏢：答錯返回打擊（隨等級增加傷害）
     if (weaponType === "boomerang") {
       const bdmg = 1 + wBonus;
@@ -496,7 +496,7 @@ function answerQuestion(btn, isCorrect, q) {
   document.getElementById("next-question").classList.remove("hidden");
   document.getElementById("q-correct").textContent = state.quiz.correct;
 
-  // 全字池模式：每 4 題巨龍吐火 15HP
+  // 全字池模式：每 4 題巨龍吐火（6HP，50% 爆擊 12HP）
   if (state.quiz.range === "all" && (state.quiz.idx + 1) % 4 === 0) {
     const isLastQ = (state.quiz.idx + 1) >= state.quiz.questions.length;
     if (isLastQ) document.getElementById("next-question").classList.add("hidden");
@@ -507,11 +507,13 @@ function answerQuestion(btn, isCorrect, q) {
         return;
       }
       if (!gameEl || gameEl.classList.contains("hidden")) return;
-      showBattleEffect("🔥巨龍吐火！-15", "#ff4500");
+      const dragonDmg = getDragonDamage();
+      const isCrit = dragonDmg > 6;
+      showBattleEffect(isCrit ? `🔥巨龍爆擊！-${dragonDmg}` : `🔥巨龍吐火 -${dragonDmg}`, "#ff4500");
       setTimeout(() => {
         if (battleState.playerHp <= 0) return;
         if (!gameEl || gameEl.classList.contains("hidden")) return;
-        triggerMonsterAttack(15);
+        triggerMonsterAttack(dragonDmg);
         if (isLastQ) {
           setTimeout(() => {
             if (battleState.playerHp > 0) document.getElementById("next-question").classList.remove("hidden");
@@ -1184,6 +1186,10 @@ function triggerAttack(isCritical) {
       }
     }, 550);
   }, 280);
+}
+
+function getDragonDamage() {
+  return Math.random() < 0.5 ? 12 : 6;
 }
 
 function triggerMonsterAttack(overrideDamage) {
