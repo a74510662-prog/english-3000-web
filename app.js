@@ -116,6 +116,7 @@ function loadProgress() {
     }
     if (p.char.equippedWeapon === undefined) p.char.equippedWeapon = null;
     if (p.char.coins === undefined) p.char.coins = 0;
+    if (p.char.rainbowTickets === undefined) p.char.rainbowTickets = 0;
     if (!p.dailyTasks) p.dailyTasks = { date: "", enToZhDone: false, zhToEnDone: false };
     if (!p.lastLoginDate) p.lastLoginDate = "";
     return p;
@@ -132,7 +133,7 @@ function newProgress() {
     quizCorrect: 0,
     quizWrong: 0,
     shuffleOffset: 0,
-    char: { level: 1, exp: 0, maxHp: 3, equippedWeapon: null, weaponInventory: [], potions: 0, chests: 0, coins: 0, avatar: "🧙" },
+    char: { level: 1, exp: 0, maxHp: 3, equippedWeapon: null, weaponInventory: [], potions: 0, chests: 0, coins: 0, rainbowTickets: 0, avatar: "🧙" },
     dailyTasks: { date: "", enToZhDone: false, zhToEnDone: false },
     lastLoginDate: ""
   };
@@ -352,7 +353,7 @@ function tryStartQuiz() {
     resetQuizSetup();
     return;
   }
-  const numQuestions = Math.min(10, pool.length);
+  const numQuestions = state.quiz.range === "all" ? Math.min(25, pool.length) : Math.min(10, pool.length);
   state.quiz.questions = shuffle(pool).slice(0, numQuestions);
   state.quiz.pool = pool;
   state.quiz.idx = 0;
@@ -556,6 +557,15 @@ function finishQuiz() {
       perfectBonus = `<br><span style="color:#f4a261;font-size:0.95rem">🌟 全對獎勵！💰+10 金幣</span>`;
     }
     chestLine = `<br><span style="color:#f4a261;font-size:0.95rem">💰 擊殺獎勵：+${killCoins} 金幣（${killed} 隻）</span>${perfectBonus}`;
+  } else if (state.quiz.range === "all") {
+    if (state.quiz.correct === total) {
+      ensureChar();
+      progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 1;
+      saveProgress(progress);
+      chestLine = `<br><span style="color:#a29bfe;font-size:0.95rem">🌈 25 題全對！獲得彩虹券 ×1（目前 ${progress.char.rainbowTickets} 張）</span>`;
+    } else {
+      chestLine = `<br><span style="color:var(--text-light);font-size:0.9rem">答對 ${state.quiz.correct}/${total} 題，25 題全對可獲得 🌈 彩虹券</span>`;
+    }
   } else if (chestEarned) {
     chestLine = `<br><span style="color:#f4a261;font-size:0.95rem">📦 任務達成！獲得寶箱 ×1（本場全對！）</span>`;
   } else if (state.quiz.correct < total) {
@@ -1477,7 +1487,7 @@ function showBattleChestBonus() {
 }
 
 function checkSessionChallenge(mode) {
-  if (state.quiz && state.quiz.range === "learned") return false;
+  if (state.quiz && (state.quiz.range === "learned" || state.quiz.range === "all")) return false;
   const total = state.quiz.questions.length;
   if (state.quiz.correct < total) return false;
   ensureChar();
@@ -1605,6 +1615,7 @@ function renderCharPanel() {
   }
   set("inv-potions", c.potions);
   set("inv-chests", c.chests);
+  set("inv-rainbow", c.rainbowTickets || 0);
   set("task-en-zh-status", dt.enToZhDone ? "✅" : "⬜");
   set("task-zh-en-status", dt.zhToEnDone ? "✅" : "⬜");
   set("task-challenge-status", dt.challengeDone ? "✅" : "⬜");
