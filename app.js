@@ -492,6 +492,18 @@ function answerQuestion(btn, isCorrect, q) {
   fb.classList.remove("hidden");
   document.getElementById("next-question").classList.remove("hidden");
   document.getElementById("q-correct").textContent = state.quiz.correct;
+
+  // 熟記模式：每 5 題怪物自動出手一次
+  if (state.quiz.range === "learned" && (state.quiz.idx + 1) % 5 === 0) {
+    setTimeout(() => {
+      if (battleState.playerHp <= 0) return;
+      showBattleEffect("⚔️怪物出手！", "#e74c3c");
+      setTimeout(() => {
+        if (battleState.playerHp <= 0) return;
+        triggerMonsterAttack();
+      }, 600);
+    }, 1000);
+  }
 }
 
 function nextQuestion() {
