@@ -117,6 +117,8 @@ function loadProgress() {
     if (p.char.equippedWeapon === undefined) p.char.equippedWeapon = null;
     if (p.char.coins === undefined) p.char.coins = 0;
     if (p.char.rainbowTickets === undefined) p.char.rainbowTickets = 0;
+    // 重新計算 HP（新級距：每 12 級 +1，舊為每 5 級 +1）
+    p.char.maxHp = 3 + Math.floor((p.char.level || 1) / 12);
     if (!p.dailyTasks) p.dailyTasks = { date: "", enToZhDone: false, zhToEnDone: false };
     if (!p.lastLoginDate) p.lastLoginDate = "";
     return p;
@@ -1236,7 +1238,8 @@ function showDefeat() {
 
 // === 角色系統 ===
 const EXP_PER_LEVEL = 10;
-const LEVELS_PER_HP_UP = 5;
+const LEVELS_PER_HP_UP = 12;
+const MAX_LEVEL = 999;
 
 function ensureChar() {
   if (!progress.char) progress.char = { level: 1, exp: 0, maxHp: 3, weapon: null, potions: 0, chests: 0, coins: 0 };
@@ -1400,14 +1403,16 @@ function ensureDailyTasks() {
 
 function addExp(amount) {
   ensureChar();
+  if (progress.char.level >= MAX_LEVEL) { progress.char.exp = 0; return false; }
   progress.char.exp += amount;
   let leveled = false;
-  while (progress.char.exp >= EXP_PER_LEVEL) {
+  while (progress.char.exp >= EXP_PER_LEVEL && progress.char.level < MAX_LEVEL) {
     progress.char.exp -= EXP_PER_LEVEL;
     progress.char.level++;
     leveled = true;
     if (progress.char.level % LEVELS_PER_HP_UP === 0) progress.char.maxHp++;
   }
+  if (progress.char.level >= MAX_LEVEL) progress.char.exp = 0;
   saveProgress(progress);
   if (leveled) setTimeout(() => giveLevelUpWeapons(), 400);
   return leveled;
@@ -1719,9 +1724,11 @@ function renderCharPanel() {
   const learnedHp = 10 + learnedTier * 2;
   const learnedAtk = 1 + Math.floor(learnedTier / 25);
   const learnedCount = Math.min((progress.learnedIds || []).length, 3000);
+  const nextHpLevel = (Math.floor((c.level || 1) / LEVELS_PER_HP_UP) + 1) * LEVELS_PER_HP_UP;
   if (mhpInfo) mhpInfo.innerHTML =
-    `一般模式怪物：${getMonsterMaxHp()} HP（完成 ${days} 天，每 31 天升一階，上限 50HP）<br>` +
-    `熟記模式怪物：${learnedHp} HP／攻擊 ${learnedAtk}（熟記 ${learnedCount} 字，每 30 字升一級距，上限 3000 字 210HP）`;
+    `HP 成長：每 12 級 +1（Lv.504 ≈ 44HP 可扛龍火，Lv.999 最高 86HP）<br>` +
+    `下次 HP 提升：Lv.${nextHpLevel}（目前 ${c.maxHp} HP）<br>` +
+    `一般模式怪物：${days} 天，上限 50HP｜熟記模式怪物：${learnedHp}HP（${learnedCount} 字）`;
 }
 
 // === 事件綁定 ===
