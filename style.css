@@ -1081,6 +1081,20 @@ body {
   white-space: nowrap;
 }
 .shop-buy-btn:active { background: var(--primary-light); }
+.shop-buy-rainbow { background: #6c3fd4; }
+.shop-buy-rainbow:active { background: #8a5ce0; }
+.shop-legend-header {
+  margin: 16px 0 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #a29bfe;
+  letter-spacing: 0.04em;
+}
+.shop-item-legend {
+  border: 1.5px solid #ffd700;
+  background: linear-gradient(135deg, #fff9e6, #fff);
+}
+.shop-legend-name { color: #b8860b; font-weight: 700; }
 
 /* 平板 / 桌面版調整 */
 @media (min-width: 768px) {

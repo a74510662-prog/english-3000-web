@@ -660,6 +660,7 @@ const WEAPON_TYPES = [
   { key: "thunder",   name: "雷霆錘",   emoji: "⚡",  hit: ["⚡", "💥"],  color: "#fdcb6e", special: "⚡連鎖閃電：爆擊追加 +2 傷害" },
   { key: "dark",      name: "暗黑之刃", emoji: "🌙",  hit: ["🌑", "💀"],  color: "#6c5ce7", special: "🌙吸血：擊殺怪物後回復 1HP" },
   { key: "holy",      name: "龍魂聖劍", emoji: "💎",  hit: ["✨", "💎"],  color: "#f4a261", special: "💎神聖庇護：每 5 題答對自動治癒 1HP" },
+  { key: "dragon_sword", name: "巨龍神劍", emoji: "🐉", hit: ["🔥", "❄️", "⚡"], color: "#ffd700", special: "🐉龍息：爆擊造成 3 倍傷害" },
 ];
 
 const STAGE_WEAPON_POOLS = [
@@ -736,8 +737,9 @@ function getWeaponSpecialDesc(wt, item) {
     case "ice":       return `❄️凍結：爆擊計時 +${5 + b}s`;
     case "thunder":   return `⚡連鎖閃電：爆擊追加 +${2 + b} 傷害`;
     case "dark":      return `🌙吸血：擊殺回復 ${1 + b}HP`;
-    case "holy":      return `💎神聖庇護：每 5 爆擊治癒 ${1 + b}HP`;
-    default:          return wt.special || "";
+    case "holy":         return `💎神聖庇護：每 5 爆擊治癒 ${1 + b}HP`;
+    case "dragon_sword": return `🐉龍息：爆擊造成 3 倍傷害（+${b} 基礎）`;
+    default:             return wt.special || "";
   }
 }
 
@@ -1091,7 +1093,7 @@ function triggerAttack(isCritical) {
       setTimeout(() => slash.remove(), 380);
     }
     const atk = getPlayerAttack();
-    let dmg = isCritical ? atk * 2 : atk;
+    let dmg = isCritical ? (wt.key === "dragon_sword" ? atk * 3 : atk * 2) : atk;
     if (isCritical) {
       // 弓箭：爆擊穿透（隨等級增加傷害）
       if (wt.key === "bow") dmg += 1 + wBonus;
@@ -1251,13 +1253,42 @@ function giveLevelUpWeapons() {
 
 function renderShop() {
   const coins = (progress.char && progress.char.coins) || 0;
+  const tickets = (progress.char && progress.char.rainbowTickets) || 0;
   document.querySelectorAll(".coins-display").forEach(el => el.textContent = coins);
   const shopCoins = document.getElementById("shop-coins-val");
   if (shopCoins) shopCoins.textContent = coins;
+  const shopRainbow = document.getElementById("shop-rainbow-val");
+  if (shopRainbow) shopRainbow.textContent = tickets;
 }
 
 function buyItem(item, cost) {
   ensureChar();
+  // 彩虹券商品
+  if (item === "dragon_sword") {
+    const tickets = progress.char.rainbowTickets || 0;
+    if (tickets < cost) { alert(`彩虹券不足！需要 🌈${cost}，目前 🌈${tickets}`); return; }
+    progress.char.rainbowTickets -= cost;
+    const wt = getWeaponTypeData("dragon_sword");
+    const inv = progress.char.weaponInventory || [];
+    const existing = inv.find(x => x.type === "dragon_sword");
+    let upgradeText = "";
+    if (existing) {
+      existing.count = (existing.count || 0) + 1;
+      if (existing.count >= 5) {
+        existing.count -= 5;
+        existing.level = (existing.level || 0) + 1;
+        upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}（龍息傷害 +${existing.level}）`;
+      }
+    } else {
+      inv.push({ type: "dragon_sword", attack: 8, level: 0, count: 1 });
+      if (!progress.char.equippedWeapon) progress.char.equippedWeapon = "dragon_sword";
+    }
+    progress.char.weaponInventory = inv;
+    saveProgress(progress);
+    renderShop();
+    showChestModal("🐉", `${wt.name} 碎片 ×1<br><span style="font-size:0.85rem;color:#ffd700">傳說武器</span>${upgradeText}`);
+    return;
+  }
   const coins = progress.char.coins || 0;
   if (coins < cost) { alert(`金幣不足！需要 💰${cost}，目前 💰${coins}`); return; }
   progress.char.coins -= cost;
