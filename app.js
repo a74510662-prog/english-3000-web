@@ -425,26 +425,28 @@ function answerQuestion(btn, isCorrect, q) {
   if (isCorrect) {
     state.quiz.correct++;
     progress.quizCorrect++;
-    // 龍魂聖劍：每 5 題治癒 1HP
     battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
-    if (weaponType === "holy" && battleState.consecutiveCorrect % 5 === 0) {
-      healPlayer(1);
-      showBattleEffect("💎+1HP", "#f4a261");
-    }
-    // 三叉戟：答對後中毒
-    if (weaponType === "trident") {
-      battleState.poisoned = true;
-      showBattleEffect("💧中毒", "#0984e3");
-    }
-    // 冰霜杖：答對凍結計時 5 秒
-    if (weaponType === "ice") {
-      extendTimer(5000);
-      showBattleEffect("❄️凍結+5s", "#74b9ff");
-    }
-    // 戰錘：爆擊時延長計時 3 秒
-    if (weaponType === "hammer" && isCritical) {
-      extendTimer(3000);
-      showBattleEffect("⚒️震盪+3s", "#636e72");
+    if (!isCritical) {
+      // 龍魂聖劍：每 5 題治癒 1HP（普通答對）
+      if (weaponType === "holy" && battleState.consecutiveCorrect % 5 === 0) {
+        healPlayer(1);
+        showBattleEffect("💎+1HP", "#f4a261");
+      }
+      // 三叉戟：普通答對後中毒
+      if (weaponType === "trident") {
+        battleState.poisoned = true;
+        showBattleEffect("💧中毒", "#0984e3");
+      }
+      // 冰霜杖：普通答對凍結計時 5 秒
+      if (weaponType === "ice") {
+        extendTimer(5000);
+        showBattleEffect("❄️凍結+5s", "#74b9ff");
+      }
+      // 戰錘：普通答對延長計時 3 秒
+      if (weaponType === "hammer") {
+        extendTimer(3000);
+        showBattleEffect("⚒️震盪+3s", "#636e72");
+      }
     }
     fb.textContent = isCritical ? (fireCrit ? "🔥 燃燒爆擊！答對了！" : "⚡ 爆擊！答對了！") : "✓ 答對了!";
     fb.className = "quiz-feedback ok";
@@ -588,11 +590,11 @@ const WEAPON_TYPES = [
   { key: "bow",       name: "弓箭",     emoji: "🏹",  hit: ["🏹"],        color: "#00b894", projectile: true,  projEmoji: "➤",  special: "🏹穿透：答對額外 +1 傷害" },
   { key: "staff",     name: "魔法杖",   emoji: "🪄",  hit: ["✨", "💫"],  color: "#a29bfe", special: "✨魔力回復：擊殺怪物後計時 +4 秒" },
   { key: "boomerang", name: "迴旋鏢",   emoji: "🪃",  hit: ["🪃", "💥"],  color: "#e17055", projectile: true,  projEmoji: "🪃",  special: "🪃返回打擊：答錯仍造成 1 傷害" },
-  { key: "hammer",    name: "戰錘",     emoji: "⚒️",  hit: ["💢", "💥"],  color: "#636e72", special: "⚒️震盪：爆擊時計時 +3 秒" },
+  { key: "hammer",    name: "戰錘",     emoji: "⚒️",  hit: ["💢", "💥"],  color: "#636e72", special: "⚒️震盪：普通答對時計時 +3 秒" },
   { key: "trident",   name: "三叉戟",   emoji: "🔱",  hit: ["🔱", "💧"],  color: "#0984e3", special: "💧海神之毒：答對使怪物中毒，下題 -1HP" },
   { key: "fire",      name: "火焰劍",   emoji: "🔥",  hit: ["🔥", "💥"],  color: "#d63031", special: "🔥燃燒：爆擊機率額外 +15%" },
   { key: "ice",       name: "冰霜杖",   emoji: "❄️",  hit: ["❄️", "💫"],  color: "#74b9ff", special: "❄️凍結：答對後計時停止 5 秒" },
-  { key: "thunder",   name: "雷霆錘",   emoji: "⚡",  hit: ["⚡", "💥"],  color: "#fdcb6e", special: "⚡連鎖閃電：爆擊追加 +2 傷害" },
+  { key: "thunder",   name: "雷霆錘",   emoji: "⚡",  hit: ["⚡", "💥"],  color: "#fdcb6e", special: "⚡連鎖閃電：普通答對追加 +2 傷害" },
   { key: "dark",      name: "暗黑之刃", emoji: "🌙",  hit: ["🌑", "💀"],  color: "#6c5ce7", special: "🌙吸血：擊殺怪物後回復 1HP" },
   { key: "holy",      name: "龍魂聖劍", emoji: "💎",  hit: ["✨", "💎"],  color: "#f4a261", special: "💎神聖庇護：每 5 題答對自動治癒 1HP" },
 ];
@@ -981,12 +983,14 @@ function triggerAttack(isCritical) {
     }
     const atk = getPlayerAttack();
     let dmg = isCritical ? atk * 2 : atk;
-    // 弓箭：穿透 +1
-    if (wt.key === "bow") dmg += 1;
-    // 雷霆錘：連鎖閃電爆擊 +2
-    if (wt.key === "thunder" && isCritical) {
-      dmg += 2;
-      showBattleEffect("⚡連鎖", wt.color);
+    if (!isCritical) {
+      // 弓箭：穿透 +1（普通攻擊）
+      if (wt.key === "bow") dmg += 1;
+      // 雷霆錘：連鎖閃電 +2（普通攻擊）
+      if (wt.key === "thunder") {
+        dmg += 2;
+        showBattleEffect("⚡連鎖", wt.color);
+      }
     }
     if (isCritical && critEl) {
       critEl.textContent = `CRITICAL!! -${dmg}HP`;
@@ -1011,8 +1015,8 @@ function triggerAttack(isCritical) {
         handleMonsterDeath(monsterEl);
         return;
       }
-      // 匕首：速攻 25% 機率追加 -1
-      if (wt.key === "dagger" && Math.random() < 0.25) {
+      // 匕首：速攻 25% 機率追加 -1（普通攻擊）
+      if (!isCritical && wt.key === "dagger" && Math.random() < 0.25) {
         setTimeout(() => {
           if (battleState.hp <= 0) return;
           battleState.hp = Math.max(0, battleState.hp - 1);
