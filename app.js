@@ -1203,8 +1203,8 @@ function giveLevelUpWeapons() {
     if (existing) {
       existing.attack = Math.max(existing.attack, atk);
       existing.count = (existing.count || 0) + 1;
-      if (existing.count >= 10) {
-        existing.count -= 10;
+      if (existing.count >= 5) {
+        existing.count -= 5;
         existing.level = (existing.level || 0) + 1;
         upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
       }
@@ -1248,8 +1248,8 @@ function buyItem(item, cost) {
     if (existing) {
       existing.attack = Math.max(existing.attack, atk);
       existing.count = (existing.count || 0) + 1;
-      if (existing.count >= 10) {
-        existing.count -= 10;
+      if (existing.count >= 5) {
+        existing.count -= 5;
         existing.level = (existing.level || 0) + 1;
         upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
       }
@@ -1356,13 +1356,13 @@ function openChest() {
       existing.attack = Math.max(existing.attack, atk);
       existing.count = (existing.count || 0) + 1;
       let upgradeText = "";
-      if (existing.count >= 10) {
-        existing.count -= 10;
+      if (existing.count >= 5) {
+        existing.count -= 5;
         existing.level = (existing.level || 0) + 1;
         upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}（傷害 +${existing.attack + existing.level}）`;
         emoji = "🆙";
       }
-      text = `${wt.name} ×${existing.count}/10${upgradeText}`;
+      text = `${wt.name} ×${existing.count}/5${upgradeText}`;
     } else {
       inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
       if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
@@ -1515,7 +1515,7 @@ function renderWeaponInventory() {
       <div class="weapon-item-icon">${wt.emoji}</div>
       <div class="weapon-item-info">
         <div class="weapon-item-name">${wt.name} +${w.attack}${lvTag}</div>
-        <div class="weapon-item-sub">升級進度 ${w.count}/10・實際傷害 +${w.attack + (w.level || 0)}</div>
+        <div class="weapon-item-sub">升級進度 ${w.count}/5・實際傷害 +${w.attack + (w.level || 0)}</div>
         <div class="weapon-item-special">${getWeaponSpecialDesc(wt, w)}</div>
       </div>
       <div class="weapon-item-action">
