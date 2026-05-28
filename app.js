@@ -1321,7 +1321,7 @@ function buyItem(item, cost) {
     if (existing) { alert("已擁有巨龍神劍！彩虹券未消耗。"); return; }
     if (tickets < cost) { alert(`彩虹券不足！需要 🌈${cost}，目前 🌈${tickets}`); return; }
     progress.char.rainbowTickets -= cost;
-    inv.push({ type: "dragon_sword", attack: 17, level: 0, count: 0 });
+    inv.push({ type: "dragon_sword", attack: 19, level: 0, count: 0 });
     if (!progress.char.equippedWeapon) progress.char.equippedWeapon = "dragon_sword";
     progress.char.weaponInventory = inv;
     saveProgress(progress);
