@@ -641,13 +641,13 @@ function getEquippedWeaponItem() {
   return (progress.char.weaponInventory || []).find(x => x.type === progress.char.equippedWeapon) || null;
 }
 
-let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, consecutiveCorrect: 0 };
+let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, consecutiveCorrect: 0, pendingTimerExtend: 0 };
 let questionStartTime = null;
 let timerInterval = null;
 
 function initBattle() {
   const mHp = getMonsterMaxHp();
-  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, consecutiveCorrect: 0 };
+  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, consecutiveCorrect: 0, pendingTimerExtend: 0 };
   const mChar = document.getElementById("monster-char");
   if (mChar) { mChar.textContent = MONSTERS[0]; mChar.className = "battle-char"; }
   const pChar = document.getElementById("player-char");
@@ -691,7 +691,9 @@ function updateQuizPotionBtn() {
 }
 
 function startQuestionTimer() {
-  questionStartTime = Date.now();
+  const extend = battleState.pendingTimerExtend || 0;
+  battleState.pendingTimerExtend = 0;
+  questionStartTime = Date.now() + extend;
   clearInterval(timerInterval);
   const bar = document.getElementById("timer-bar");
   if (!bar) return;
@@ -899,7 +901,7 @@ function shakeArena(isCritical) {
 }
 
 function extendTimer(ms) {
-  if (questionStartTime !== null) questionStartTime += ms;
+  battleState.pendingTimerExtend = (battleState.pendingTimerExtend || 0) + ms;
 }
 
 function healPlayer(amount) {
