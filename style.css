@@ -239,6 +239,12 @@ body {
   color: white;
   border-color: var(--primary);
 }
+.range-reward {
+  margin-left: 6px;
+  font-size: 1.1rem;
+  vertical-align: middle;
+  opacity: 0.85;
+}
 
 .quiz-progress {
   background: white;
