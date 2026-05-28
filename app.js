@@ -675,6 +675,27 @@ function getSfxCtx() {
   return _sfxCtx;
 }
 
+function unlockSfx() {
+  const ctx = getSfxCtx();
+  if (!ctx) return;
+  const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start(0);
+  ctx.resume();
+}
+
+function initSfxUnlock() {
+  const handler = () => {
+    unlockSfx();
+    document.removeEventListener('touchstart', handler, true);
+    document.removeEventListener('click', handler, true);
+  };
+  document.addEventListener('touchstart', handler, { capture: true, passive: true });
+  document.addEventListener('click', handler, { capture: true });
+}
+
 function sfxOsc(ctx, type, freqStart, freqEnd, dur, vol, startAt) {
   const t = startAt !== undefined ? startAt : ctx.currentTime;
   const osc = ctx.createOscillator();
@@ -1266,6 +1287,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showUserPicker();
   }
 
+  initSfxUnlock();
   document.getElementById("switch-user-btn").addEventListener("click", showUserPicker);
   document.getElementById("sfx-toggle-btn").addEventListener("click", () => {
     _sfxMuted = !_sfxMuted;
