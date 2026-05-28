@@ -1,0 +1,1000 @@
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --primary: #2c5f87;
+  --primary-light: #4a8bb5;
+  --accent: #f4a261;
+  --bg: #f7f9fb;
+  --card: #ffffff;
+  --text: #2d3436;
+  --text-light: #636e72;
+  --border: #dfe6e9;
+  --correct: #27ae60;
+  --wrong: #e74c3c;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", "PingFang TC", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding-left: 64px;
+  min-height: 100vh;
+}
+
+.hidden { display: none !important; }
+
+/* 頂部 Header */
+.app-header {
+  background: var(--primary);
+  color: white;
+  padding: 12px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.app-header h1 { font-size: 1.2rem; text-align: center; margin-bottom: 8px; }
+.day-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.day-selector button {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.day-selector button:active { background: rgba(255,255,255,0.4); }
+#day-label { font-weight: bold; font-size: 1rem; min-width: 80px; text-align: center; }
+
+/* 主視圖切換 */
+.view { display: none; padding: 16px; }
+.view.active { display: block; }
+
+/* 卡片瀏覽 */
+.card-counter {
+  text-align: center;
+  color: var(--text-light);
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+.card-container { perspective: 1200px; min-height: 380px; margin-bottom: 16px; }
+
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 24px 20px;
+  position: relative;
+  transition: transform 0.5s;
+  transform-style: preserve-3d;
+  cursor: pointer;
+  min-height: 380px;
+}
+.card.flipped { transform: rotateY(180deg); }
+.card-face {
+  position: absolute;
+  inset: 0;
+  padding: 24px 20px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.card-back { transform: rotateY(180deg); }
+
+.level-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--accent);
+  color: white;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.word-en {
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: var(--primary);
+  text-align: center;
+  margin: 20px 0 12px;
+}
+.word-pos { text-align: center; color: var(--accent); font-style: italic; margin-bottom: 8px; }
+.phonetic {
+  text-align: center;
+  color: var(--text-light);
+  margin: 4px 0;
+  font-size: 0.95rem;
+  font-family: "Times New Roman", serif;
+}
+.hint {
+  text-align: center;
+  color: var(--text-light);
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+.speak-btn {
+  display: block;
+  margin: 16px auto;
+  background: var(--primary-light);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 24px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.speak-btn:active { background: var(--primary); }
+.tap-hint {
+  text-align: center;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.word-zh {
+  font-size: 1.6rem;
+  font-weight: bold;
+  text-align: center;
+  margin: 16px 0;
+  color: var(--text);
+}
+.example {
+  background: #f0f4f8;
+  border-left: 3px solid var(--primary-light);
+  padding: 10px 12px;
+  margin: 8px 0;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+.example-en { color: var(--text); margin-bottom: 4px; }
+.example-zh { color: var(--text-light); font-size: 0.88rem; }
+.example .speak-mini {
+  background: none;
+  border: 1px solid var(--primary-light);
+  color: var(--primary-light);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  margin-left: 6px;
+  cursor: pointer;
+}
+
+.learn-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  background: white;
+  border: 1px solid var(--correct);
+  color: var(--correct);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.learn-btn.learned { background: var(--correct); color: white; }
+
+/* 卡片導航 */
+.card-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.card-nav button {
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.card-nav button:active { background: var(--bg); }
+#flip-card { background: var(--accent); color: white; border: none; }
+
+.mark-done-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--correct);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.mark-done-btn.done { background: var(--text-light); }
+
+/* 測驗 */
+#view-quiz h2 { margin-bottom: 16px; }
+#view-quiz h3 { margin: 16px 0 8px; font-size: 1rem; color: var(--text-light); }
+.quiz-mode-group, .quiz-range-group { display: grid; gap: 8px; }
+.quiz-mode-group button, .quiz-range-group button {
+  padding: 14px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.quiz-mode-group button.active, .quiz-range-group button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.quiz-progress {
+  background: white;
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+.quiz-question {
+  background: white;
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: bold;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  color: var(--primary);
+}
+.quiz-options { display: grid; gap: 6px; margin-bottom: 8px; }
+.quiz-options button {
+  padding: 9px 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+.quiz-options button.correct { background: var(--correct); color: white; border-color: var(--correct); }
+.quiz-options button.wrong { background: var(--wrong); color: white; border-color: var(--wrong); }
+.quiz-options button:disabled { cursor: not-allowed; }
+
+.quiz-feedback {
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  text-align: center;
+}
+.quiz-feedback.ok { background: #e8f5e9; color: var(--correct); }
+.quiz-feedback.no { background: #ffebee; color: var(--wrong); }
+
+#next-question, #quit-quiz, #quiz-restart {
+  width: 100%;
+  padding: 10px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  margin-top: 6px;
+}
+#quit-quiz { background: var(--text-light); }
+
+#quiz-result { text-align: center; padding: 32px 16px; }
+#quiz-score { font-size: 1.4rem; margin: 16px 0; }
+
+/* 進度 */
+.stat-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.stat-num { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+.stat-label { font-size: 0.8rem; color: var(--text-light); margin-top: 4px; }
+
+.progress-bar-wrap {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.progress-bar {
+  background: var(--border);
+  border-radius: 10px;
+  height: 20px;
+  overflow: hidden;
+}
+#progress-fill {
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  height: 100%;
+  width: 0;
+  transition: width 0.6s;
+}
+.progress-text { text-align: center; margin-top: 8px; font-size: 0.9rem; color: var(--text-light); }
+
+.quiz-stats, .search-section {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.quiz-stats h3, .search-section h3 { margin-bottom: 8px; font-size: 1rem; }
+.quiz-stats div { padding: 4px 0; }
+
+#word-search {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+#search-results .result-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+#search-results .result-item:last-child { border: none; }
+.result-en { font-weight: bold; color: var(--primary); }
+.result-zh { color: var(--text-light); font-size: 0.9rem; }
+.result-day { color: var(--accent); font-size: 0.75rem; }
+
+.danger-btn {
+  width: 100%;
+  padding: 12px;
+  background: white;
+  color: var(--wrong);
+  border: 1px solid var(--wrong);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* 左側導航 */
+.side-nav {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 64px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.08);
+  z-index: 10;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+.nav-btn {
+  background: none;
+  border: none;
+  padding: 14px 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  color: var(--text-light);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.nav-btn:active { background: var(--bg); }
+.nav-btn.active { color: var(--primary); border-left-color: var(--primary); background: #eef4fa; }
+.nav-icon { font-size: 1.4rem; }
+
+/* 戰鬥場景 */
+.battle-arena {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  background: linear-gradient(160deg, #0d0d1a 0%, #1a1a2e 30%, #16213e 60%, #0f3460 100%);
+  border-radius: 20px;
+  padding: 12px 16px 16px;
+  margin-bottom: 8px;
+  min-height: 160px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+/* 大氣星光背景 */
+.battle-arena::before {
+  content: "✦ ✧ ✦ ✧ ✦ ✧ ✦";
+  position: absolute;
+  top: 10px; left: 0; right: 0;
+  text-align: center;
+  color: rgba(255,255,255,0.1);
+  font-size: 0.65rem;
+  letter-spacing: 14px;
+  pointer-events: none;
+  animation: stars-drift 4s ease-in-out infinite;
+}
+@keyframes stars-drift {
+  0%, 100% { transform: translateX(-6px); opacity: 0.08; }
+  50% { transform: translateX(6px); opacity: 0.16; }
+}
+/* 地面光暈 */
+.battle-arena::after {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #4a8bb5, #a29bfe, #f4a261, #e74c3c, #f4a261);
+  background-size: 200% 100%;
+  animation: ground-glow 3s linear infinite;
+}
+@keyframes ground-glow { 0% { background-position: 0% 0%; } 100% { background-position: 200% 0%; } }
+
+.battle-fighter { display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1; }
+.battle-mid { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.vs-banner { font-size: 1.6rem; opacity: 0.35; animation: vs-pulse 2s ease-in-out infinite; }
+@keyframes vs-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.2); opacity: 0.55; }
+}
+
+@keyframes char-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.battle-char { font-size: 3.6rem; line-height: 1; display: block; animation: char-idle 2.2s ease-in-out infinite; }
+.fighter-label { font-size: 0.72rem; color: rgba(255,255,255,0.65); letter-spacing: 0.03em; }
+.monster-hp-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.monster-hp-bar-bg {
+  width: 110px; height: 12px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.monster-hp-fill {
+  height: 100%; width: 100%;
+  background: #27ae60;
+  border-radius: 6px;
+  transition: width 0.35s ease, background 0.35s;
+}
+.monster-hp-text { font-size: 0.72rem; color: rgba(255,255,255,0.7); }
+
+.hit-effect {
+  position: absolute;
+  left: 62%; top: 42%;
+  transform: translate(-50%, -50%) scale(0);
+  font-size: 3.2rem;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 10;
+}
+
+/* 傷害數字 */
+.damage-number {
+  position: absolute;
+  font-size: 1.8rem;
+  font-weight: 900;
+  text-shadow: 0 0 10px rgba(0,0,0,0.9), 0 2px 6px rgba(0,0,0,0.7);
+  pointer-events: none;
+  z-index: 30;
+  animation: dmg-rise 0.95s ease-out forwards;
+  white-space: nowrap;
+}
+.damage-number.crit-dmg { font-size: 2.6rem; }
+@keyframes dmg-rise {
+  0%   { opacity: 1; transform: translateY(0) scale(1.4); }
+  25%  { opacity: 1; transform: translateY(-18px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-55px) scale(0.85); }
+}
+
+/* 粒子爆炸 */
+.battle-particle {
+  position: absolute;
+  pointer-events: none;
+  z-index: 20;
+  animation: particle-burst 0.75s ease-out forwards;
+}
+@keyframes particle-burst {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1.3); }
+  100% { opacity: 0; transform: translate(var(--tx, 20px), var(--ty, -35px)) scale(0.2); }
+}
+
+/* 畫面震動 */
+@keyframes arena-shake {
+  0%, 100% { transform: translate(0,0); }
+  15% { transform: translate(-6px, 2px); }
+  30% { transform: translate(7px, -2px); }
+  45% { transform: translate(-5px, 1px); }
+  60% { transform: translate(5px, -1px); }
+  80% { transform: translate(-2px, 0); }
+}
+@keyframes arena-shake-big {
+  0%, 100% { transform: translate(0,0) rotate(0deg); }
+  10% { transform: translate(-10px, 3px) rotate(-1.5deg); }
+  25% { transform: translate(11px, -3px) rotate(1.5deg); }
+  40% { transform: translate(-8px, 2px) rotate(-1deg); }
+  55% { transform: translate(9px, -2px) rotate(1deg); }
+  70% { transform: translate(-5px, 1px) rotate(-0.5deg); }
+  85% { transform: translate(5px, -1px) rotate(0.5deg); }
+}
+.battle-arena.shaking     { animation: arena-shake 0.4s ease-out; }
+.battle-arena.shaking-big { animation: arena-shake-big 0.5s ease-out; }
+
+/* 學習者 HP 數值 */
+.player-hp-num {
+  font-size: 0.88rem;
+  font-weight: bold;
+  color: #27ae60;
+  background: rgba(0,0,0,0.25);
+  padding: 2px 8px;
+  border-radius: 8px;
+  min-width: 40px;
+  text-align: center;
+  transition: color 0.3s;
+}
+
+/* 測驗內藥水按鈕 */
+.quiz-potion-row { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+.quiz-potion-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.quiz-potion-btn:not(:disabled):hover { border-color: #27ae60; color: #27ae60; }
+.quiz-potion-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+/* 每日挑戰 Toast */
+.challenge-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: white;
+  padding: 10px 22px;
+  border-radius: 22px;
+  font-size: 0.92rem;
+  z-index: 500;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+  white-space: nowrap;
+  pointer-events: none;
+}
+@keyframes toast-fade {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  12%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+}
+.challenge-toast.show { animation: toast-fade 2.8s ease forwards; }
+
+/* 計時條 */
+.timer-bar-wrap {
+  height: 5px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.timer-bar {
+  height: 100%;
+  width: 100%;
+  background: #27ae60;
+  transition: none;
+}
+
+/* CRITICAL 浮動文字 */
+.critical-text {
+  position: absolute;
+  left: 50%; top: 30%;
+  transform: translate(-50%, -50%);
+  font-size: 1rem;
+  font-weight: bold;
+  color: #f4a261;
+  text-shadow: 0 0 8px rgba(244,162,97,0.9);
+  pointer-events: none;
+  opacity: 0;
+  white-space: nowrap;
+  z-index: 10;
+}
+@keyframes crit-float {
+  0%   { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+  50%  { transform: translate(-50%, -80%) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%,-110%) scale(1);   opacity: 0; }
+}
+.critical-text.crit-anim { animation: crit-float 0.9s ease-out forwards; }
+
+/* 怪物攻擊動畫 */
+@keyframes monster-attack {
+  0%, 100% { transform: scale(1) translateX(0); }
+  35% { transform: scale(1.4) translateX(-26px); }
+  60% { transform: scale(1.15) translateX(-14px); }
+}
+.battle-char.monster-attacking { animation: monster-attack 0.5s ease-in-out; }
+
+/* 學習者受擊動畫 */
+@keyframes player-hit-anim {
+  0%, 100% { transform: translateX(0); filter: brightness(1); }
+  15% { transform: translateX(12px);  filter: brightness(5) saturate(0.3); }
+  35% { transform: translateX(-12px); filter: brightness(5) saturate(0.3); }
+  55% { transform: translateX(6px);   filter: brightness(2.5); }
+  75% { transform: translateX(-6px);  filter: brightness(2.5); }
+}
+.battle-char.player-hit { animation: player-hit-anim 0.55s ease-in-out; }
+
+/* 學習者死亡動畫 */
+@keyframes player-die-anim {
+  0%   { transform: scale(1) rotate(0deg);   opacity: 1; }
+  40%  { transform: scale(1.4) rotate(-22deg); opacity: 0.85; }
+  100% { transform: scale(0) rotate(-65deg); opacity: 0; }
+}
+.battle-char.player-dying { animation: player-die-anim 0.65s ease-in-out forwards; }
+
+/* 敗北畫面 */
+#quiz-defeat { text-align: center; padding: 32px 16px; }
+#quiz-defeat h2 { font-size: 1.6rem; margin-bottom: 16px; }
+.defeat-score { font-size: 1.2rem; margin: 16px 0 24px; line-height: 1.8; }
+#defeat-restart {
+  width: 100%; padding: 14px;
+  background: var(--wrong); color: white;
+  border: none; border-radius: 8px;
+  font-size: 1rem; cursor: pointer;
+}
+
+/* 測驗發音按鈕 */
+.quiz-speak-btn {
+  display: block; margin: 10px auto 0;
+  background: var(--primary-light); color: white;
+  border: none; padding: 8px 20px;
+  border-radius: 20px; font-size: 0.9rem; cursor: pointer;
+}
+.quiz-speak-btn:active { background: var(--primary); }
+
+/* 戰鬥動畫 */
+@keyframes player-attack {
+  0%, 100% { transform: scale(1) translateX(0); }
+  35% { transform: scale(1.4) translateX(26px); }
+  60% { transform: scale(1.15) translateX(14px); }
+}
+@keyframes monster-hit {
+  0%, 100% { transform: translateX(0); filter: brightness(1); }
+  15% { transform: translateX(-12px); filter: brightness(5) saturate(0.3); }
+  35% { transform: translateX(12px); filter: brightness(5) saturate(0.3); }
+  55% { transform: translateX(-6px); filter: brightness(2.5); }
+  75% { transform: translateX(6px); filter: brightness(2.5); }
+}
+@keyframes monster-die {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; }
+  40% { transform: scale(1.4) rotate(22deg); opacity: 0.85; }
+  100% { transform: scale(0) rotate(65deg); opacity: 0; }
+}
+@keyframes monster-appear {
+  0% { transform: scale(0) translateY(-22px); opacity: 0; }
+  65% { transform: scale(1.3) translateY(6px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes hit-burst {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
+  55% { transform: translate(-50%, -50%) scale(1.9); opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+}
+
+.battle-char.attacking { animation: player-attack 0.5s ease-in-out; }
+.battle-char.hit       { animation: monster-hit 0.55s ease-in-out; }
+.battle-char.dying     { animation: monster-die 0.65s ease-in-out forwards; }
+.battle-char.appearing { animation: monster-appear 0.5s ease-out; }
+.hit-effect.burst      { animation: hit-burst 0.45s ease-out forwards; }
+
+.weapon-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  opacity: 0;
+  animation: weapon-flash-anim 0.4s ease-out forwards;
+  pointer-events: none;
+  z-index: 5;
+}
+@keyframes weapon-flash-anim {
+  0%   { opacity: 0.3; }
+  100% { opacity: 0; }
+}
+
+.weapon-projectile {
+  position: absolute;
+  left: 18%;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.3rem;
+  animation: projectile-fly 0.28s ease-in forwards;
+  pointer-events: none;
+  z-index: 15;
+}
+@keyframes projectile-fly {
+  0%   { left: 18%; opacity: 1; }
+  100% { left: 72%; opacity: 0.2; }
+}
+
+.battle-chest-bonus {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.5rem;
+  font-weight: bold;
+  pointer-events: none;
+  animation: chest-bonus-float 1.2s ease-out forwards;
+  z-index: 20;
+}
+@keyframes chest-bonus-float {
+  0%   { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -200%); }
+}
+
+/* 角色面板 */
+.weapon-page-header {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.weapon-equipped-row { font-size: 0.9rem; color: var(--text); }
+.weapon-equipped-row span { font-weight: 600; color: var(--accent); }
+.weapon-inventory { display: flex; flex-direction: column; gap: 8px; }
+.weapon-empty { font-size: 0.82rem; color: var(--text-light); text-align: center; padding: 8px 0; }
+.weapon-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 10px;
+  background: var(--bg); border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+.weapon-item.equipped { border-color: var(--accent); background: #fff8f0; }
+.weapon-item-icon { font-size: 1.6rem; flex-shrink: 0; }
+.weapon-item-info { flex: 1; min-width: 0; }
+.weapon-item-name { font-size: 0.88rem; font-weight: 600; }
+.weapon-item-sub { font-size: 0.75rem; color: var(--text-light); margin-top: 2px; }
+.weapon-lv-tag { color: var(--accent); font-size: 0.78rem; font-weight: 700; }
+.weapon-item-action { flex-shrink: 0; }
+.weapon-badge { font-size: 0.72rem; color: var(--accent); font-weight: 700; }
+.weapon-equip-btn {
+  font-size: 0.75rem; padding: 4px 10px;
+  background: var(--primary); color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+}
+.weapon-equip-btn:hover { background: var(--primary-light); }
+
+.char-avatar-wrap { text-align: center; padding: 16px 0 8px; }
+.char-avatar-big { font-size: 4rem; line-height: 1; cursor: pointer; }
+.avatar-hint { font-size: 0.72rem; color: var(--text-light); margin-top: 4px; }
+.avatar-picker { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 10px; background: var(--card); border-radius: 12px; margin: 8px 0 4px; box-shadow: var(--shadow); }
+.avatar-option { font-size: 1.6rem; background: none; border: 2px solid transparent; border-radius: 8px; cursor: pointer; padding: 4px 6px; transition: border-color 0.15s; }
+.avatar-option.selected { border-color: var(--accent); }
+.avatar-option:hover { border-color: var(--primary-light); }
+.char-name-lv { font-size: 1.1rem; font-weight: bold; margin-top: 6px; }
+.char-lv-badge {
+  background: var(--accent); color: white;
+  padding: 2px 10px; border-radius: 12px;
+  font-size: 0.85rem; margin-left: 6px;
+}
+.char-stats-card, .char-inventory-card, .daily-tasks-card {
+  background: white; border-radius: 12px;
+  padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow);
+}
+.char-stats-card h3, .char-inventory-card h3, .daily-tasks-card h3 {
+  font-size: 0.9rem; margin-bottom: 10px; color: var(--text-light);
+}
+.char-stat-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.92rem;
+}
+.char-stat-row:last-child { border-bottom: none; }
+.char-exp-wrap { display: flex; align-items: center; gap: 8px; }
+.char-exp-bar-bg {
+  width: 80px; height: 8px; background: var(--border);
+  border-radius: 4px; overflow: hidden;
+}
+.char-exp-fill {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 4px; transition: width 0.4s;
+}
+.inventory-row {
+  display: flex; align-items: center; padding: 8px 0;
+  border-bottom: 1px solid var(--border); gap: 8px; font-size: 0.92rem;
+}
+.inventory-row:last-child { border-bottom: none; }
+.inventory-row span:nth-child(2) { margin-left: auto; font-weight: bold; color: var(--primary); min-width: 20px; text-align: right; }
+.inv-btn {
+  padding: 5px 14px; border: none; border-radius: 6px;
+  font-size: 0.85rem; cursor: pointer;
+  background: var(--primary-light); color: white;
+}
+.chest-btn { background: var(--accent); }
+.inv-btn:active { opacity: 0.75; }
+.task-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;
+}
+.task-row:last-of-type { border-bottom: none; }
+.task-status { font-size: 1.1rem; flex-shrink: 0; }
+.task-hint { margin-top: 8px; font-size: 0.78rem; color: var(--text-light); }
+
+/* 寶箱 Modal */
+.chest-modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.62);
+  z-index: 300;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.chest-modal-box {
+  background: white; border-radius: 20px; padding: 32px 24px;
+  width: 100%; max-width: 320px; text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+.chest-anim { font-size: 4rem; line-height: 1; margin-bottom: 16px; display: block; }
+@keyframes chest-open-anim {
+  0%   { transform: scale(1) rotate(0deg); }
+  30%  { transform: scale(1.5) rotate(-12deg); }
+  60%  { transform: scale(1.3) rotate(10deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.chest-anim.chest-open { animation: chest-open-anim 0.6s ease-out; }
+.chest-reward-text { font-size: 1.05rem; line-height: 1.6; margin-bottom: 20px; min-height: 44px; }
+.chest-close-btn {
+  padding: 12px 32px; background: var(--primary); color: white;
+  border: none; border-radius: 8px; font-size: 1rem; cursor: pointer;
+}
+.chest-close-btn:active { background: var(--primary-light); }
+
+/* 使用者選擇 Overlay */
+.user-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.user-picker-box {
+  background: white;
+  border-radius: 20px;
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+.user-picker-box h2 {
+  text-align: center;
+  color: var(--primary);
+  margin-bottom: 20px;
+  font-size: 1.3rem;
+}
+.user-list { margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; min-height: 40px; }
+.user-row { display: flex; align-items: center; gap: 8px; }
+.user-card {
+  flex: 1;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: bold;
+  color: var(--primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.user-card:hover, .user-card:active { background: var(--primary); color: white; border-color: var(--primary); }
+.user-delete-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: white;
+  border: 1px solid var(--wrong);
+  color: var(--wrong);
+  font-size: 0.85rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.add-user-section { display: flex; gap: 8px; }
+.add-user-section input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+}
+.add-user-section input:focus { border-color: var(--primary); }
+.add-user-section button {
+  padding: 10px 16px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.add-user-section button:active { background: var(--primary-light); }
+
+/* Header 頂行 */
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 8px;
+}
+.user-switch-btn {
+  position: absolute;
+  right: 0;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.user-switch-btn:active { background: rgba(255,255,255,0.4); }
+#current-user-name {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* 平板 / 桌面版調整 */
+@media (min-width: 768px) {
+  body {
+    padding-left: 80px;
+    background: #d8e4ed;
+  }
+  .side-nav { width: 80px; }
+  .app-header {
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+    border-radius: 0 0 14px 14px;
+  }
+  #app {
+    max-width: 520px;
+    margin: 12px auto 0;
+    background: var(--bg);
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    min-height: calc(100vh - 80px);
+    padding-bottom: 24px;
+  }
+}

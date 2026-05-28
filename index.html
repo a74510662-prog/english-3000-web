@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#2c5f87" />
+  <title>Oxford 3000 每日單字</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-top">
+      <h1 id="page-title">每日單字</h1>
+      <button id="switch-user-btn" class="user-switch-btn">
+        <span id="current-user-name">-</span> 👤
+      </button>
+    </div>
+    <div class="day-selector">
+      <button id="back-to-today" aria-label="回到今日">⟲</button>
+      <span id="date-label">載入中...</span>
+    </div>
+  </header>
+
+  <!-- 使用者選擇 -->
+  <div id="user-picker-overlay" class="user-picker-overlay">
+    <div class="user-picker-box">
+      <h2>選擇學習者</h2>
+      <div id="user-list" class="user-list"></div>
+      <div class="add-user-section">
+        <input type="text" id="new-user-input" placeholder="輸入名稱..." maxlength="20" />
+        <button id="add-user-btn">新增</button>
+      </div>
+    </div>
+  </div>
+
+  <main id="app">
+    <!-- 卡片瀏覽頁 -->
+    <section id="view-cards" class="view active">
+      <div class="card-counter">
+        <span id="card-index">1</span> / <span id="card-total">10</span>
+      </div>
+      <div id="card-container" class="card-container"></div>
+      <div class="card-nav">
+        <button id="prev-card">上一個</button>
+        <button id="flip-card">翻面</button>
+        <button id="next-card">下一個</button>
+      </div>
+      <button id="mark-done" class="mark-done-btn">標記今日已完成</button>
+    </section>
+
+    <!-- 測驗頁 -->
+    <section id="view-quiz" class="view">
+      <div id="quiz-setup">
+        <h2>選擇測驗模式</h2>
+        <div class="quiz-mode-group">
+          <button data-mode="en-to-zh">英譯中</button>
+          <button data-mode="zh-to-en">中譯英</button>
+        </div>
+        <h3>測驗範圍</h3>
+        <div class="quiz-range-group">
+          <button data-range="today">僅今日 10 字</button>
+          <button data-range="learned">全部已熟記</button>
+          <button data-range="all">全字池隨機</button>
+        </div>
+      </div>
+      <div id="quiz-game" class="hidden">
+        <!-- 戰鬥場景 -->
+        <div id="battle-arena" class="battle-arena">
+          <div class="battle-fighter">
+            <div id="player-char" class="battle-char">🧙</div>
+            <div id="player-hp-num" class="player-hp-num">3/3</div>
+            <div class="fighter-label">學習者</div>
+          </div>
+          <div class="battle-mid"><div class="vs-banner">⚔️</div></div>
+          <div class="battle-fighter">
+            <div id="monster-char" class="battle-char">👹</div>
+            <div class="monster-hp-wrap">
+              <div class="monster-hp-bar-bg">
+                <div id="monster-hp-fill" class="monster-hp-fill"></div>
+              </div>
+              <div class="monster-hp-text">HP <span id="monster-hp-val">10</span>/<span id="monster-hp-max-val">10</span></div>
+            </div>
+          </div>
+          <div id="hit-effect" class="hit-effect"></div>
+          <div id="critical-text" class="critical-text"></div>
+        </div>
+        <div class="timer-bar-wrap">
+          <div id="timer-bar" class="timer-bar"></div>
+        </div>
+        <div class="quiz-potion-row">
+          <button id="quiz-use-potion-btn" class="quiz-potion-btn" disabled>🧪 藥水 <span id="quiz-potion-count">0</span></button>
+        </div>
+        <div class="quiz-progress">
+          題目 <span id="q-current">1</span> / <span id="q-total">10</span>
+          ｜ 答對 <span id="q-correct">0</span>
+        </div>
+        <div id="quiz-question" class="quiz-question"></div>
+        <div id="quiz-options" class="quiz-options"></div>
+        <div id="quiz-feedback" class="quiz-feedback hidden"></div>
+        <button id="next-question" class="hidden">下一題</button>
+        <button id="quit-quiz">結束測驗</button>
+      </div>
+      <div id="quiz-result" class="hidden">
+        <h2>測驗結果</h2>
+        <div id="quiz-score"></div>
+        <button id="quiz-restart">再來一次</button>
+      </div>
+      <div id="quiz-defeat" class="hidden">
+        <h2>💀 被怪物打倒了！</h2>
+        <div id="defeat-score" class="defeat-score"></div>
+        <button id="defeat-restart">重新挑戰</button>
+      </div>
+    </section>
+
+    <!-- 進度頁 -->
+    <section id="view-progress" class="view">
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-num" id="stat-streak">0</div>
+          <div class="stat-label">連續學習天數</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-days">0</div>
+          <div class="stat-label">已完成天數</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-words">0</div>
+          <div class="stat-label">已熟記字數</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-percent">0%</div>
+          <div class="stat-label">總進度</div>
+        </div>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+        <div class="progress-text"><span id="progress-current">0</span> / <span id="progress-total">3000</span></div>
+        <div class="progress-text" id="available-info" style="margin-top:6px;font-size:0.78rem">目前單字池：載入中</div>
+      </div>
+      <div class="quiz-stats">
+        <h3>測驗統計</h3>
+        <div>累計答對：<span id="total-correct">0</span></div>
+        <div>累計答錯：<span id="total-wrong">0</span></div>
+        <div>正確率：<span id="accuracy">0%</span></div>
+      </div>
+      <div class="search-section">
+        <h3>單字搜尋</h3>
+        <input type="text" id="word-search" placeholder="輸入英文或中文..." />
+        <div id="search-results"></div>
+      </div>
+      <button id="reset-progress" class="danger-btn">重設所有進度</button>
+    </section>
+
+    <!-- 角色道具頁 -->
+    <section id="view-char" class="view">
+      <div class="char-avatar-wrap">
+        <div class="char-avatar-big" id="char-avatar-big">🧙</div>
+        <div class="avatar-hint">點擊更換頭像</div>
+        <div id="avatar-picker" class="avatar-picker hidden"></div>
+        <div class="char-name-lv"><span id="char-user-name">學習者</span> <span class="char-lv-badge">Lv.<span id="char-level">1</span></span></div>
+      </div>
+      <div class="char-stats-card">
+        <div class="char-stat-row">
+          <span>EXP</span>
+          <div class="char-exp-wrap">
+            <div class="char-exp-bar-bg"><div id="char-exp-fill" class="char-exp-fill"></div></div>
+            <span id="char-exp-text">0 / 10</span>
+          </div>
+        </div>
+        <div class="char-stat-row"><span>最大 HP</span><span id="char-max-hp">3</span></div>
+        <div class="char-stat-row"><span>攻擊力</span><span id="char-attack">1</span></div>
+        <div class="char-stat-row"><span>武器傷害</span><span id="char-weapon">無</span></div>
+      </div>
+      <div class="char-inventory-card">
+        <h3>道具欄</h3>
+        <div class="inventory-row">
+          <span>🧪 HP 藥水</span>
+          <span id="inv-potions">0</span>
+        </div>
+        <div class="inventory-row">
+          <span>📦 寶箱</span>
+          <span id="inv-chests">0</span>
+          <button id="open-chest-btn" class="inv-btn chest-btn">開啟</button>
+        </div>
+      </div>
+      <div class="daily-tasks-card">
+        <h3>每日任務</h3>
+        <div class="task-row">
+          <span>英翻中測驗（本場擊敗 2/2 怪物）</span>
+          <span id="task-en-zh-status" class="task-status">⬜</span>
+        </div>
+        <div class="task-row">
+          <span>中翻英測驗（本場擊敗 2/2 怪物）</span>
+          <span id="task-zh-en-status" class="task-status">⬜</span>
+        </div>
+        <div class="task-row">
+          <span>每日挑戰（兩項達成，獲得 EXP 1~3）</span>
+          <span id="task-challenge-status" class="task-status">⬜</span>
+        </div>
+        <p class="task-hint">各測驗本場擊敗 ≥2 隻怪物可獲 📦 寶箱（每日各一次）；兩項都達成後額外獲得 EXP 1~3 經驗獎勵</p>
+        <p class="task-hint" style="margin-top:4px">單場擊敗第 3 隻起每多消滅 1 隻額外獲得 📦 寶箱 ×1（每種測驗每日各自計算，已領位置隔日重置）</p>
+        <p id="monster-hp-info" class="task-hint" style="margin-top:4px"></p>
+      </div>
+    </section>
+
+    <!-- 武器庫頁 -->
+    <section id="view-weapon" class="view">
+      <div class="weapon-page-header">
+        <div class="weapon-equipped-row">目前裝備：<span id="weapon-equipped-display">無</span></div>
+      </div>
+      <div id="weapon-inventory" class="weapon-inventory"></div>
+    </section>
+  </main>
+
+  <!-- 每日挑戰完成 Toast -->
+  <div id="challenge-toast" class="challenge-toast hidden">📦 每日挑戰完成！獲得寶箱 ×1</div>
+
+  <!-- 寶箱開啟 Modal -->
+  <div id="chest-modal" class="chest-modal hidden">
+    <div class="chest-modal-box">
+      <div id="chest-anim" class="chest-anim">📦</div>
+      <div id="chest-reward-text" class="chest-reward-text"></div>
+      <button id="chest-close-btn" class="chest-close-btn">收下</button>
+    </div>
+  </div>
+
+  <nav class="side-nav">
+    <button class="nav-btn active" data-view="cards">
+      <span class="nav-icon">📖</span><span>單字</span>
+    </button>
+    <button class="nav-btn" data-view="quiz">
+      <span class="nav-icon">✏️</span><span>測驗</span>
+    </button>
+    <button class="nav-btn" data-view="progress">
+      <span class="nav-icon">📊</span><span>進度</span>
+    </button>
+    <button class="nav-btn" data-view="char">
+      <span class="nav-icon">⚔️</span><span>角色</span>
+    </button>
+    <button class="nav-btn" data-view="weapon">
+      <span class="nav-icon">🗡️</span><span>武器庫</span>
+    </button>
+  </nav>
+
+  <script src="words.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

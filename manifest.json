@@ -1,0 +1,20 @@
+{
+  "name": "Oxford 3000 每日單字",
+  "short_name": "英文 3000",
+  "description": "每日 10 字英文學習，含 KK + IPA 音標、寵物門市情境例句、發音朗讀與隨堂測驗",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f9fb",
+  "theme_color": "#2c5f87",
+  "orientation": "portrait",
+  "lang": "zh-Hant",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
