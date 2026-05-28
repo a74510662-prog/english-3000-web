@@ -361,9 +361,11 @@ function renderQuestion() {
   // 三叉戟：中毒扣血
   if (battleState.poisoned && battleState.hp > 0) {
     battleState.poisoned = false;
-    battleState.hp = Math.max(0, battleState.hp - 1);
+    const pdmg = battleState.poisonDmg || 1;
+    battleState.poisonDmg = 1;
+    battleState.hp = Math.max(0, battleState.hp - pdmg);
     updateMonsterHP();
-    showDamageNumber(1, false, "#0984e3");
+    showDamageNumber(pdmg, false, "#0984e3");
     if (battleState.hp <= 0) {
       const monsterEl = document.getElementById("monster-char");
       if (monsterEl) handleMonsterDeath(monsterEl);
@@ -410,9 +412,11 @@ function renderQuestion() {
 
 function answerQuestion(btn, isCorrect, q) {
   const elapsed = questionStartTime ? Date.now() - questionStartTime : 99999;
-  const weaponType = getEquippedWeaponItem()?.type;
-  // 火焰劍：額外 15% 爆擊機率
-  const fireCrit = weaponType === "fire" && isCorrect && Math.random() < 0.15;
+  const weaponItem = getEquippedWeaponItem();
+  const weaponType = weaponItem?.type;
+  const wBonus = getWeaponBonus(weaponItem);
+  // 火焰劍：爆擊機率隨等級提升
+  const fireCrit = weaponType === "fire" && isCorrect && Math.random() < (0.15 + wBonus * 0.05);
   const isCritical = isCorrect && (elapsed <= CRITICAL_MS || fireCrit);
   stopQuestionTimer();
 
@@ -427,25 +431,30 @@ function answerQuestion(btn, isCorrect, q) {
     progress.quizCorrect++;
     battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
     if (isCritical) {
-      // 龍魂聖劍：每 5 次爆擊治癒 1HP
+      // 龍魂聖劍：每 5 次爆擊治癒（隨等級增加回復量）
       if (weaponType === "holy" && battleState.consecutiveCorrect % 5 === 0) {
-        healPlayer(1);
-        showBattleEffect("💎+1HP", "#f4a261");
+        const heal = 1 + wBonus;
+        healPlayer(heal);
+        showBattleEffect(`💎+${heal}HP`, "#f4a261");
       }
-      // 三叉戟：爆擊後中毒
+      // 三叉戟：爆擊後中毒（隨等級增加毒傷）
       if (weaponType === "trident") {
+        const pdmg = 1 + wBonus;
         battleState.poisoned = true;
-        showBattleEffect("💧中毒", "#0984e3");
+        battleState.poisonDmg = pdmg;
+        showBattleEffect(`💧中毒-${pdmg}HP`, "#0984e3");
       }
-      // 冰霜杖：爆擊凍結計時 5 秒
+      // 冰霜杖：爆擊凍結（隨等級延長秒數）
       if (weaponType === "ice") {
-        extendTimer(5000);
-        showBattleEffect("❄️凍結+5s", "#74b9ff");
+        const secs = 5 + wBonus;
+        extendTimer(secs * 1000);
+        showBattleEffect(`❄️凍結+${secs}s`, "#74b9ff");
       }
-      // 戰錘：爆擊延長計時 3 秒
+      // 戰錘：爆擊震盪（隨等級延長秒數）
       if (weaponType === "hammer") {
-        extendTimer(3000);
-        showBattleEffect("⚒️震盪+3s", "#636e72");
+        const secs = 3 + wBonus;
+        extendTimer(secs * 1000);
+        showBattleEffect(`⚒️震盪+${secs}s`, "#636e72");
       }
     }
     fb.textContent = isCritical ? (fireCrit ? "🔥 燃燒爆擊！答對了！" : "⚡ 爆擊！答對了！") : "✓ 答對了!";
@@ -457,14 +466,15 @@ function answerQuestion(btn, isCorrect, q) {
     fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
     fb.className = "quiz-feedback no";
     triggerMonsterAttack();
-    // 迴旋鏢：答錯仍造成 1 傷害
+    // 迴旋鏢：答錯返回打擊（隨等級增加傷害）
     if (weaponType === "boomerang") {
+      const bdmg = 1 + wBonus;
       setTimeout(() => {
         if (battleState.hp <= 0) return;
-        battleState.hp = Math.max(0, battleState.hp - 1);
+        battleState.hp = Math.max(0, battleState.hp - bdmg);
         updateMonsterHP();
-        showDamageNumber(1, false, "#e17055");
-        showBattleEffect("🪃返回打擊", "#e17055");
+        showDamageNumber(bdmg, false, "#e17055");
+        showBattleEffect(`🪃返回-${bdmg}`, "#e17055");
         if (battleState.hp <= 0) {
           const monsterEl = document.getElementById("monster-char");
           if (monsterEl) handleMonsterDeath(monsterEl);
@@ -643,13 +653,35 @@ function getEquippedWeaponItem() {
   return (progress.char.weaponInventory || []).find(x => x.type === progress.char.equippedWeapon) || null;
 }
 
-let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, consecutiveCorrect: 0, pendingTimerExtend: 0 };
+function getWeaponBonus(item) {
+  return Math.floor((item?.level || 0) / 2);
+}
+
+function getWeaponSpecialDesc(wt, item) {
+  const b = getWeaponBonus(item);
+  switch (wt.key) {
+    case "dagger":    return `⚡速攻：爆擊 ${25 + b * 5}% 機率追加 -1`;
+    case "bow":       return `🏹穿透：爆擊額外 +${1 + b} 傷害`;
+    case "staff":     return `✨魔力回復：擊殺後計時 +${4 + b}s`;
+    case "boomerang": return `🪃返回打擊：答錯造成 ${1 + b} 傷害`;
+    case "hammer":    return `⚒️震盪：爆擊計時 +${3 + b}s`;
+    case "trident":   return `💧海神之毒：爆擊中毒 -${1 + b}HP`;
+    case "fire":      return `🔥燃燒：爆擊機率 +${15 + b * 5}%`;
+    case "ice":       return `❄️凍結：爆擊計時 +${5 + b}s`;
+    case "thunder":   return `⚡連鎖閃電：爆擊追加 +${2 + b} 傷害`;
+    case "dark":      return `🌙吸血：擊殺回復 ${1 + b}HP`;
+    case "holy":      return `💎神聖庇護：每 5 爆擊治癒 ${1 + b}HP`;
+    default:          return wt.special || "";
+  }
+}
+
+let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0 };
 let questionStartTime = null;
 let timerInterval = null;
 
 function initBattle() {
   const mHp = getMonsterMaxHp();
-  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, consecutiveCorrect: 0, pendingTimerExtend: 0 };
+  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0 };
   const mChar = document.getElementById("monster-char");
   if (mChar) { mChar.textContent = MONSTERS[0]; mChar.className = "battle-char"; }
   const pChar = document.getElementById("player-char");
@@ -954,7 +986,9 @@ function triggerAttack(isCritical) {
   playerEl.classList.add("attacking");
 
   setTimeout(() => {
-    const wt = getWeaponTypeData(getEquippedWeaponItem()?.type);
+    const equippedItem = getEquippedWeaponItem();
+    const wt = getWeaponTypeData(equippedItem?.type);
+    const wBonus = getWeaponBonus(equippedItem);
     const arenaEl = document.getElementById("battle-arena");
     // 武器特效：箭矢投射
     if (wt.projectile && arenaEl) {
@@ -984,12 +1018,13 @@ function triggerAttack(isCritical) {
     const atk = getPlayerAttack();
     let dmg = isCritical ? atk * 2 : atk;
     if (isCritical) {
-      // 弓箭：爆擊穿透 +1
-      if (wt.key === "bow") dmg += 1;
-      // 雷霆錘：爆擊連鎖閃電 +2
+      // 弓箭：爆擊穿透（隨等級增加傷害）
+      if (wt.key === "bow") dmg += 1 + wBonus;
+      // 雷霆錘：爆擊連鎖閃電（隨等級增加傷害）
       if (wt.key === "thunder") {
-        dmg += 2;
-        showBattleEffect("⚡連鎖", wt.color);
+        const bonus = 2 + wBonus;
+        dmg += bonus;
+        showBattleEffect(`⚡連鎖+${bonus}`, wt.color);
       }
     }
     if (isCritical && critEl) {
@@ -1006,7 +1041,7 @@ function triggerAttack(isCritical) {
     showDamageNumber(dmg, isCritical, wt.color);
     createParticles(wt, isCritical);
     shakeArena(isCritical);
-    playWeaponSfx(getEquippedWeaponItem()?.type || 'dagger');
+    playWeaponSfx(equippedItem?.type || 'dagger');
 
     setTimeout(() => {
       monsterEl.classList.remove("hit");
@@ -1015,8 +1050,8 @@ function triggerAttack(isCritical) {
         handleMonsterDeath(monsterEl);
         return;
       }
-      // 匕首：爆擊速攻 25% 機率追加 -1
-      if (isCritical && wt.key === "dagger" && Math.random() < 0.25) {
+      // 匕首：爆擊速攻（隨等級提升觸發機率）
+      if (isCritical && wt.key === "dagger" && Math.random() < (0.25 + wBonus * 0.05)) {
         setTimeout(() => {
           if (battleState.hp <= 0) return;
           battleState.hp = Math.max(0, battleState.hp - 1);
@@ -1215,16 +1250,20 @@ function usePotion() {
 
 function onMonsterKilled() {
   battleState.sessionMonstersKilled = (battleState.sessionMonstersKilled || 0) + 1;
-  const weaponType = getEquippedWeaponItem()?.type;
-  // 暗黑之刃：吸血回復 1HP
+  const killedWeaponItem = getEquippedWeaponItem();
+  const weaponType = killedWeaponItem?.type;
+  const wBonus = getWeaponBonus(killedWeaponItem);
+  // 暗黑之刃：吸血（隨等級增加回復量）
   if (weaponType === "dark") {
-    healPlayer(1);
-    showBattleEffect("🌙吸血+1HP", "#6c5ce7");
+    const heal = 1 + wBonus;
+    healPlayer(heal);
+    showBattleEffect(`🌙吸血+${heal}HP`, "#6c5ce7");
   }
-  // 魔法杖：擊殺後計時 +4 秒
+  // 魔法杖：擊殺後計時（隨等級延長秒數）
   if (weaponType === "staff") {
-    extendTimer(4000);
-    showBattleEffect("✨魔力+4s", "#a29bfe");
+    const secs = 4 + wBonus;
+    extendTimer(secs * 1000);
+    showBattleEffect(`✨魔力+${secs}s`, "#a29bfe");
   }
   if (battleState.sessionMonstersKilled >= 3) {
     ensureDailyTasks(); ensureChar();
@@ -1312,7 +1351,7 @@ function renderWeaponInventory() {
       <div class="weapon-item-info">
         <div class="weapon-item-name">${wt.name} +${w.attack}${lvTag}</div>
         <div class="weapon-item-sub">升級進度 ${w.count}/10・實際傷害 +${w.attack + (w.level || 0)}</div>
-        <div class="weapon-item-special">${wt.special || ""}</div>
+        <div class="weapon-item-special">${getWeaponSpecialDesc(wt, w)}</div>
       </div>
       <div class="weapon-item-action">
         ${isEquipped
