@@ -1285,11 +1285,17 @@ function giveLevelUpWeapons() {
     const existing = inv.find(x => x.type === typeKey);
     if (existing) {
       existing.attack = Math.max(existing.attack, atk);
-      existing.count = (existing.count || 0) + 1;
-      if (existing.count >= 5) {
-        existing.count -= 5;
-        existing.level = (existing.level || 0) + 1;
-        upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
+      if ((existing.level || 0) >= 10) {
+        upgradeText = `<br>（${wt.name} 已達最高等級 Lv.10）`;
+      } else {
+        existing.count = (existing.count || 0) + 1;
+        if (existing.count >= 5) {
+          existing.count -= 5;
+          existing.level = (existing.level || 0) + 1;
+          upgradeText = existing.level >= 10
+            ? `<br>🏆 ${wt.name} 達到最高等級 Lv.10！`
+            : `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
+        }
       }
     } else {
       inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
@@ -1349,11 +1355,17 @@ function buyItem(item, cost) {
     let upgradeText = "";
     if (existing) {
       existing.attack = Math.max(existing.attack, atk);
-      existing.count = (existing.count || 0) + 1;
-      if (existing.count >= 5) {
-        existing.count -= 5;
-        existing.level = (existing.level || 0) + 1;
-        upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
+      if ((existing.level || 0) >= 10) {
+        upgradeText = `<br>（${wt.name} 已達最高等級 Lv.10）`;
+      } else {
+        existing.count = (existing.count || 0) + 1;
+        if (existing.count >= 5) {
+          existing.count -= 5;
+          existing.level = (existing.level || 0) + 1;
+          upgradeText = existing.level >= 10
+            ? `<br>🏆 ${wt.name} 達到最高等級 Lv.10！`
+            : `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
+        }
       }
     } else {
       inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
@@ -1456,15 +1468,24 @@ function openChest() {
     const existing = inv.find(x => x.type === typeKey);
     if (existing) {
       existing.attack = Math.max(existing.attack, atk);
-      existing.count = (existing.count || 0) + 1;
       let upgradeText = "";
-      if (existing.count >= 5) {
-        existing.count -= 5;
-        existing.level = (existing.level || 0) + 1;
-        upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}（傷害 +${existing.attack + existing.level}）`;
-        emoji = "🆙";
+      if ((existing.level || 0) >= 10) {
+        text = `${wt.name}（已達最高等級 Lv.10）`;
+      } else {
+        existing.count = (existing.count || 0) + 1;
+        if (existing.count >= 5) {
+          existing.count -= 5;
+          existing.level = (existing.level || 0) + 1;
+          if (existing.level >= 10) {
+            upgradeText = `<br>🏆 ${wt.name} 達到最高等級 Lv.10！`;
+            emoji = "🏆";
+          } else {
+            upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}（傷害 +${existing.attack + existing.level}）`;
+            emoji = "🆙";
+          }
+        }
+        text = `${wt.name} ×${existing.count}/5${upgradeText}`;
       }
-      text = `${wt.name} ×${existing.count}/5${upgradeText}`;
     } else {
       inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
       if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
