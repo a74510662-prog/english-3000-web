@@ -631,11 +631,21 @@ function getMonsterStage() {
   const days = progress.completedDates ? progress.completedDates.length : 0;
   return Math.min(8, Math.floor(days / 31.25));
 }
+function getLearnedMonsterTier() {
+  const learned = Math.min((progress.learnedIds || []).length, 3000);
+  return Math.floor(learned / 30);
+}
 function getMonsterMaxHp() {
+  if (state.quiz && state.quiz.range === "learned") {
+    return 10 + getLearnedMonsterTier() * 2;
+  }
   const HP_STAGES = [10, 15, 20, 25, 30, 35, 40, 45, 50];
   return HP_STAGES[getMonsterStage()];
 }
 function getMonsterAttack() {
+  if (state.quiz && state.quiz.range === "learned") {
+    return 1 + Math.floor(getLearnedMonsterTier() / 25);
+  }
   return getMonsterStage() + 1;
 }
 function getPlayerMaxHp() {
@@ -1427,7 +1437,13 @@ function renderCharPanel() {
   if (fill) fill.style.width = (c.exp / EXP_PER_LEVEL * 100) + "%";
   const mhpInfo = document.getElementById("monster-hp-info");
   const days = progress.completedDates ? progress.completedDates.length : 0;
-  if (mhpInfo) mhpInfo.textContent = `目前怪物血量：${getMonsterMaxHp()} HP（已完成 ${days} 天，每 31 天升一階，250 天達上限 50HP）`;
+  const learnedTier = getLearnedMonsterTier();
+  const learnedHp = 10 + learnedTier * 2;
+  const learnedAtk = 1 + Math.floor(learnedTier / 25);
+  const learnedCount = Math.min((progress.learnedIds || []).length, 3000);
+  if (mhpInfo) mhpInfo.innerHTML =
+    `一般模式怪物：${getMonsterMaxHp()} HP（完成 ${days} 天，每 31 天升一階，上限 50HP）<br>` +
+    `熟記模式怪物：${learnedHp} HP／攻擊 ${learnedAtk}（熟記 ${learnedCount} 字，每 30 字升一級距，上限 3000 字 210HP）`;
 }
 
 // === 事件綁定 ===
