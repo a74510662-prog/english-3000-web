@@ -952,6 +952,22 @@ body {
   position: relative;
   margin-bottom: 8px;
 }
+.sfx-toggle-btn {
+  position: absolute;
+  right: 110px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sfx-toggle-btn:active { background: rgba(255,255,255,0.4); }
 .user-switch-btn {
   position: absolute;
   right: 0;

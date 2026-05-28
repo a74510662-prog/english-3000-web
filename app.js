@@ -438,6 +438,7 @@ function nextQuestion() {
 
 function finishQuiz() {
   stopQuestionTimer();
+  playVictorySfx();
   const chestEarned = checkSessionChallenge(state.quiz.mode);
   document.getElementById("quiz-game").classList.add("hidden");
   document.getElementById("quiz-result").classList.remove("hidden");
@@ -662,6 +663,132 @@ function stopQuestionTimer() {
   timerInterval = null;
 }
 
+// === 音效系統 ===
+let _sfxCtx = null;
+let _sfxMuted = false;
+
+function getSfxCtx() {
+  if (!_sfxCtx) {
+    try { _sfxCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return null; }
+  }
+  if (_sfxCtx.state === 'suspended') _sfxCtx.resume();
+  return _sfxCtx;
+}
+
+function sfxOsc(ctx, type, freqStart, freqEnd, dur, vol, startAt) {
+  const t = startAt !== undefined ? startAt : ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freqStart, t);
+  if (freqEnd !== freqStart) osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 1), t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(t); osc.stop(t + dur + 0.02);
+}
+
+function sfxNoise(ctx, filterFreq, filterType, dur, vol, startAt) {
+  const t = startAt !== undefined ? startAt : ctx.currentTime;
+  const bufSize = Math.ceil(ctx.sampleRate * Math.max(dur, 0.05));
+  const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const filt = ctx.createBiquadFilter();
+  filt.type = filterType || 'lowpass';
+  filt.frequency.value = filterFreq;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(filt); filt.connect(g); g.connect(ctx.destination);
+  src.start(t); src.stop(t + dur + 0.02);
+}
+
+function playWeaponSfx(weaponKey) {
+  if (_sfxMuted) return;
+  const ctx = getSfxCtx(); if (!ctx) return;
+  const t = ctx.currentTime;
+  switch (weaponKey) {
+    case 'dagger':
+      sfxOsc(ctx, 'sine', 800, 250, 0.13, 0.3);
+      sfxNoise(ctx, 3000, 'highpass', 0.06, 0.15);
+      break;
+    case 'bow':
+      sfxNoise(ctx, 800, 'bandpass', 0.08, 0.18);
+      sfxOsc(ctx, 'sawtooth', 350, 60, 0.28, 0.15);
+      break;
+    case 'staff':
+      sfxOsc(ctx, 'sine', 880, 1760, 0.35, 0.18);
+      sfxOsc(ctx, 'sine', 1320, 2640, 0.2, 0.1);
+      break;
+    case 'boomerang':
+      sfxOsc(ctx, 'sine', 250, 600, 0.22, 0.18, t);
+      sfxOsc(ctx, 'sine', 600, 200, 0.22, 0.18, t + 0.22);
+      break;
+    case 'hammer':
+      sfxOsc(ctx, 'sine', 120, 30, 0.18, 0.45);
+      sfxNoise(ctx, 300, 'lowpass', 0.12, 0.3);
+      break;
+    case 'trident':
+      sfxOsc(ctx, 'sine', 660, 330, 0.2, 0.2);
+      sfxNoise(ctx, 1000, 'bandpass', 0.15, 0.15);
+      break;
+    case 'fire':
+      sfxNoise(ctx, 2000, 'bandpass', 0.32, 0.28);
+      sfxNoise(ctx, 4000, 'highpass', 0.1, 0.18);
+      break;
+    case 'ice':
+      sfxOsc(ctx, 'sine', 2093, 1047, 0.3, 0.2);
+      sfxOsc(ctx, 'sine', 4186, 2093, 0.18, 0.1);
+      break;
+    case 'thunder':
+      sfxOsc(ctx, 'square', 600, 50, 0.1, 0.35);
+      sfxNoise(ctx, 8000, 'highpass', 0.15, 0.28);
+      break;
+    case 'dark':
+      sfxOsc(ctx, 'sawtooth', 200, 55, 0.38, 0.25);
+      sfxOsc(ctx, 'sawtooth', 100, 40, 0.38, 0.18);
+      break;
+    case 'holy':
+      sfxOsc(ctx, 'sine', 1047, 1047, 0.5, 0.2);
+      sfxOsc(ctx, 'sine', 1568, 1568, 0.4, 0.12);
+      sfxOsc(ctx, 'sine', 2093, 2093, 0.3, 0.08);
+      break;
+    default:
+      sfxOsc(ctx, 'sine', 600, 200, 0.15, 0.25);
+  }
+}
+
+function playMonsterAttackSfx() {
+  if (_sfxMuted) return;
+  const ctx = getSfxCtx(); if (!ctx) return;
+  sfxOsc(ctx, 'sawtooth', 130, 65, 0.22, 0.3);
+  sfxNoise(ctx, 400, 'lowpass', 0.18, 0.22);
+}
+
+function playMonsterDeathSfx() {
+  if (_sfxMuted) return;
+  const ctx = getSfxCtx(); if (!ctx) return;
+  sfxOsc(ctx, 'sine', 500, 80, 0.45, 0.3);
+  sfxNoise(ctx, 1500, 'bandpass', 0.2, 0.22);
+}
+
+function playVictorySfx() {
+  if (_sfxMuted) return;
+  const ctx = getSfxCtx(); if (!ctx) return;
+  const t = ctx.currentTime;
+  [523, 659, 784, 1047].forEach((freq, i) => sfxOsc(ctx, 'sine', freq, freq, 0.18, 0.25, t + i * 0.2));
+}
+
+function playDefeatSfx() {
+  if (_sfxMuted) return;
+  const ctx = getSfxCtx(); if (!ctx) return;
+  const t = ctx.currentTime;
+  [523, 494, 466, 440].forEach((freq, i) => sfxOsc(ctx, 'sine', freq, freq * 0.92, 0.28, 0.22, t + i * 0.3));
+}
+
 function showDamageNumber(dmg, isCritical, color) {
   const arena = document.getElementById("battle-arena");
   if (!arena) return;
@@ -755,12 +882,14 @@ function triggerAttack(isCritical) {
     showDamageNumber(dmg, isCritical, wt.color);
     createParticles(wt, isCritical);
     shakeArena(isCritical);
+    playWeaponSfx(getEquippedWeaponItem()?.type || 'dagger');
 
     setTimeout(() => {
       monsterEl.classList.remove("hit");
       playerEl.classList.remove("attacking");
       if (battleState.hp <= 0) {
         monsterEl.classList.add("dying");
+        playMonsterDeathSfx();
         setTimeout(() => {
           onMonsterKilled();
           battleState.monsterIdx = (battleState.monsterIdx + 1) % MONSTERS.length;
@@ -793,6 +922,7 @@ function triggerMonsterAttack() {
     battleState.playerHp = Math.max(0, battleState.playerHp - getMonsterAttack());
     updatePlayerHP();
     shakeArena(false);
+    playMonsterAttackSfx();
 
     setTimeout(() => {
       monsterEl.classList.remove("monster-attacking");
@@ -807,6 +937,7 @@ function triggerMonsterAttack() {
 
 function showDefeat() {
   stopQuestionTimer();
+  playDefeatSfx();
   checkSessionChallenge(state.quiz.mode);
   document.getElementById("quiz-game").classList.add("hidden");
   document.getElementById("quiz-defeat").classList.remove("hidden");
@@ -1136,6 +1267,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   document.getElementById("switch-user-btn").addEventListener("click", showUserPicker);
+  document.getElementById("sfx-toggle-btn").addEventListener("click", () => {
+    _sfxMuted = !_sfxMuted;
+    document.getElementById("sfx-toggle-btn").textContent = _sfxMuted ? "🔇" : "🔊";
+  });
   document.getElementById("add-user-btn").addEventListener("click", () =>
     addNewUser(document.getElementById("new-user-input").value)
   );
