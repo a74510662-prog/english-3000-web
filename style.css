@@ -551,6 +551,15 @@ body {
 .battle-arena.shaking-big { animation: arena-shake-big 0.5s ease-out; }
 
 /* 學習者 HP 數值 */
+.dragon-shield-bar {
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: #ffd700;
+  background: rgba(0,0,0,0.35);
+  padding: 2px 7px;
+  border-radius: 8px;
+  text-shadow: 0 0 6px rgba(255,215,0,0.7);
+}
 .player-hp-num {
   font-size: 0.88rem;
   font-weight: bold;

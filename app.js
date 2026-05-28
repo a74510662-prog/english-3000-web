@@ -660,7 +660,7 @@ const WEAPON_TYPES = [
   { key: "thunder",   name: "雷霆錘",   emoji: "⚡",  hit: ["⚡", "💥"],  color: "#fdcb6e", special: "⚡連鎖閃電：爆擊追加 +2 傷害" },
   { key: "dark",      name: "暗黑之刃", emoji: "🌙",  hit: ["🌑", "💀"],  color: "#6c5ce7", special: "🌙吸血：擊殺怪物後回復 1HP" },
   { key: "holy",      name: "龍魂聖劍", emoji: "💎",  hit: ["✨", "💎"],  color: "#f4a261", special: "💎神聖庇護：每 5 題答對自動治癒 1HP" },
-  { key: "dragon_sword", name: "巨龍神劍", emoji: "🐉", hit: ["🔥", "❄️", "⚡"], color: "#ffd700", special: "🐉龍息：爆擊造成 3 倍傷害" },
+  { key: "dragon_sword", name: "巨龍神劍", emoji: "🐉", hit: ["🔥", "❄️", "⚡"], color: "#ffd700", special: "🐉龍息：爆擊造成 3 倍傷害・每次攻擊累積護盾（最高 10HP）" },
 ];
 
 const STAGE_WEAPON_POOLS = [
@@ -693,9 +693,8 @@ function getLearnedMonsterTier() {
   return Math.floor(learned / 30);
 }
 function getMonsterMaxHp() {
-  if (state.quiz && state.quiz.range === "learned") {
-    return 30 + getLearnedMonsterTier() * 2;
-  }
+  if (state.quiz && state.quiz.range === "all") return 1500;
+  if (state.quiz && state.quiz.range === "learned") return 30 + getLearnedMonsterTier() * 2;
   const HP_STAGES = [10, 15, 20, 25, 30, 35, 40, 45, 50];
   return HP_STAGES[getMonsterStage()];
 }
@@ -738,20 +737,20 @@ function getWeaponSpecialDesc(wt, item) {
     case "thunder":   return `⚡連鎖閃電：爆擊追加 +${2 + b} 傷害`;
     case "dark":      return `🌙吸血：擊殺回復 ${1 + b}HP`;
     case "holy":         return `💎神聖庇護：每 5 爆擊治癒 ${1 + b}HP`;
-    case "dragon_sword": return `🐉龍息：爆擊造成 3 倍傷害（+${b} 基礎）`;
+    case "dragon_sword": return `🐉龍息：爆擊 3 倍傷害・每次攻擊累積 +2🛡️（上限 10）`;
     default:             return wt.special || "";
   }
 }
 
-let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0 };
+let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0 };
 let questionStartTime = null;
 let timerInterval = null;
 
 function initBattle() {
   const mHp = getMonsterMaxHp();
-  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0 };
+  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0 };
   const mChar = document.getElementById("monster-char");
-  if (mChar) { mChar.textContent = MONSTERS[0]; mChar.className = "battle-char"; }
+  if (mChar) { mChar.textContent = state.quiz?.range === "all" ? "🐉" : MONSTERS[0]; mChar.className = "battle-char"; }
   const pChar = document.getElementById("player-char");
   if (pChar) { pChar.textContent = progress.char?.avatar || "🧙"; pChar.className = "battle-char"; }
   updateMonsterHP();
@@ -780,6 +779,18 @@ function updatePlayerHP() {
   el.textContent = `${hp}/${maxHp}`;
   el.style.color = hp <= 1 ? "#e74c3c" : hp <= Math.ceil(maxHp / 2) ? "#f39c12" : "#27ae60";
   updateQuizPotionBtn();
+}
+
+function updateShieldDisplay() {
+  const el = document.getElementById("dragon-shield-bar");
+  if (!el) return;
+  const shield = battleState.dragonShield || 0;
+  if (shield > 0) {
+    el.classList.remove("hidden");
+    el.textContent = `🛡️ ${shield}/10`;
+  } else {
+    el.classList.add("hidden");
+  }
 }
 
 function updateQuizPotionBtn() {
@@ -1036,7 +1047,7 @@ function handleMonsterDeath(monsterEl) {
     const newMHp = getMonsterMaxHp();
     battleState.monsterMaxHp = newMHp;
     battleState.hp = newMHp;
-    monsterEl.textContent = MONSTERS[battleState.monsterIdx];
+    monsterEl.textContent = state.quiz?.range === "all" ? "🐉" : MONSTERS[battleState.monsterIdx];
     monsterEl.className = "battle-char appearing";
     updateMonsterHP();
     setTimeout(() => monsterEl.classList.remove("appearing"), 500);
@@ -1119,6 +1130,12 @@ function triggerAttack(isCritical) {
     createParticles(wt, isCritical);
     shakeArena(isCritical);
     playWeaponSfx(equippedItem?.type || 'dagger');
+    // 巨龍神劍：每次攻擊累積護盾 +2（上限 10）
+    if (wt.key === "dragon_sword") {
+      battleState.dragonShield = Math.min(10, (battleState.dragonShield || 0) + 2);
+      showBattleEffect(`🛡️${battleState.dragonShield}/10`, "#ffd700");
+      updateShieldDisplay();
+    }
 
     setTimeout(() => {
       monsterEl.classList.remove("hit");
@@ -1155,7 +1172,15 @@ function triggerMonsterAttack() {
     playerEl.classList.remove("player-hit");
     void playerEl.offsetWidth;
     playerEl.classList.add("player-hit");
-    battleState.playerHp = Math.max(0, battleState.playerHp - getMonsterAttack());
+    let monsterDmg = getMonsterAttack();
+    if (battleState.dragonShield > 0) {
+      const absorbed = Math.min(battleState.dragonShield, monsterDmg);
+      battleState.dragonShield -= absorbed;
+      monsterDmg -= absorbed;
+      showBattleEffect(`🛡️-${absorbed}`, "#ffd700");
+      updateShieldDisplay();
+    }
+    battleState.playerHp = Math.max(0, battleState.playerHp - monsterDmg);
     updatePlayerHP();
     shakeArena(false);
     playMonsterAttackSfx();
@@ -1266,27 +1291,17 @@ function buyItem(item, cost) {
   // 彩虹券商品
   if (item === "dragon_sword") {
     const tickets = progress.char.rainbowTickets || 0;
-    if (tickets < cost) { alert(`彩虹券不足！需要 🌈${cost}，目前 🌈${tickets}`); return; }
-    progress.char.rainbowTickets -= cost;
-    const wt = getWeaponTypeData("dragon_sword");
     const inv = progress.char.weaponInventory || [];
     const existing = inv.find(x => x.type === "dragon_sword");
-    let upgradeText = "";
-    if (existing) {
-      existing.count = (existing.count || 0) + 1;
-      if (existing.count >= 5) {
-        existing.count -= 5;
-        existing.level = (existing.level || 0) + 1;
-        upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}（龍息傷害 +${existing.level}）`;
-      }
-    } else {
-      inv.push({ type: "dragon_sword", attack: 8, level: 0, count: 1 });
-      if (!progress.char.equippedWeapon) progress.char.equippedWeapon = "dragon_sword";
-    }
+    if (existing) { alert("已擁有巨龍神劍！彩虹券未消耗。"); return; }
+    if (tickets < cost) { alert(`彩虹券不足！需要 🌈${cost}，目前 🌈${tickets}`); return; }
+    progress.char.rainbowTickets -= cost;
+    inv.push({ type: "dragon_sword", attack: 20, level: 0, count: 0 });
+    if (!progress.char.equippedWeapon) progress.char.equippedWeapon = "dragon_sword";
     progress.char.weaponInventory = inv;
     saveProgress(progress);
     renderShop();
-    showChestModal("🐉", `${wt.name} 碎片 ×1<br><span style="font-size:0.85rem;color:#ffd700">傳說武器</span>${upgradeText}`);
+    showChestModal("🐉", `獲得 巨龍神劍！<br><span style="font-size:0.85rem;color:#ffd700">傳說武器・基礎攻擊 20・不可升階</span>`);
     return;
   }
   const coins = progress.char.coins || 0;
@@ -1576,7 +1591,7 @@ function renderWeaponInventory() {
       <div class="weapon-item-icon">${wt.emoji}</div>
       <div class="weapon-item-info">
         <div class="weapon-item-name">${wt.name} +${w.attack}${lvTag}</div>
-        <div class="weapon-item-sub">升級進度 ${w.count}/5・實際傷害 +${w.attack + (w.level || 0)}</div>
+        <div class="weapon-item-sub">${wt.key === "dragon_sword" ? `傳說武器・不可升階・基礎攻擊 ${w.attack}` : `升級進度 ${w.count}/5・實際傷害 +${w.attack + (w.level || 0)}`}</div>
         <div class="weapon-item-special">${getWeaponSpecialDesc(wt, w)}</div>
       </div>
       <div class="weapon-item-action">
