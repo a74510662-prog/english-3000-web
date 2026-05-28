@@ -493,18 +493,31 @@ function answerQuestion(btn, isCorrect, q) {
   document.getElementById("next-question").classList.remove("hidden");
   document.getElementById("q-correct").textContent = state.quiz.correct;
 
-  // 熟記模式：每 5 題怪物自動出手一次（最後一題跳過，避免結算後觸發）
-  const isLastQuestion = (state.quiz.idx + 1) >= state.quiz.questions.length;
-  if (state.quiz.range === "learned" && (state.quiz.idx + 1) % 5 === 0 && !isLastQuestion) {
+  // 熟記模式：每 5 題怪物自動出手一次
+  if (state.quiz.range === "learned" && (state.quiz.idx + 1) % 5 === 0) {
+    const isLastQuestion = (state.quiz.idx + 1) >= state.quiz.questions.length;
+    // 最後一題先鎖住「下一題」，攻擊後存活才解鎖
+    if (isLastQuestion) document.getElementById("next-question").classList.add("hidden");
+    const gameEl = document.getElementById("quiz-game");
     setTimeout(() => {
-      if (battleState.playerHp <= 0) return;
-      const gameEl = document.getElementById("quiz-game");
+      if (battleState.playerHp <= 0) {
+        if (isLastQuestion) document.getElementById("next-question").classList.remove("hidden");
+        return;
+      }
       if (!gameEl || gameEl.classList.contains("hidden")) return;
       showBattleEffect("⚔️怪物出手！", "#e74c3c");
       setTimeout(() => {
         if (battleState.playerHp <= 0) return;
         if (!gameEl || gameEl.classList.contains("hidden")) return;
         triggerMonsterAttack();
+        if (isLastQuestion) {
+          // 等攻擊動畫結束（約 1.8 秒），存活則解鎖「下一題」
+          setTimeout(() => {
+            if (battleState.playerHp > 0) {
+              document.getElementById("next-question").classList.remove("hidden");
+            }
+          }, 1900);
+        }
       }, 600);
     }, 1000);
   }
