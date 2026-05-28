@@ -423,7 +423,7 @@ function answerQuestion(btn, isCorrect, q) {
   const wBonus = getWeaponBonus(weaponItem);
   // 火焰劍：爆擊機率隨等級提升
   const fireCrit = weaponType === "fire" && isCorrect && Math.random() < (0.15 + wBonus * 0.05);
-  const isCritical = isCorrect && (elapsed <= CRITICAL_MS || fireCrit);
+  const isCritical = isCorrect && (elapsed <= getCriticalMs() || fireCrit);
   stopQuestionTimer();
 
   document.querySelectorAll("#quiz-options button").forEach(b => {
@@ -651,6 +651,9 @@ function getWeaponTypeData(key) {
   return WEAPON_TYPES.find(w => w.key === key) || WEAPON_TYPES[0];
 }
 const CRITICAL_MS = 10000;
+function getCriticalMs() {
+  return (state.quiz && state.quiz.range === "learned") ? 5000 : CRITICAL_MS;
+}
 
 // 動態數值（依進度/角色等級）
 function getMonsterStage() {
@@ -771,12 +774,13 @@ function startQuestionTimer() {
   bar.style.background = "#27ae60";
   timerInterval = setInterval(() => {
     const elapsed = Date.now() - questionStartTime;
-    const pct = Math.max(0, 100 - (elapsed / CRITICAL_MS) * 100);
+    const critMs = getCriticalMs();
+    const pct = Math.max(0, 100 - (elapsed / critMs) * 100);
     if (bar) {
       bar.style.width = pct + "%";
       bar.style.background = pct > 60 ? "#27ae60" : pct > 30 ? "#f39c12" : "#e74c3c";
     }
-    if (elapsed >= CRITICAL_MS) clearInterval(timerInterval);
+    if (elapsed >= critMs) clearInterval(timerInterval);
   }, 80);
 }
 
