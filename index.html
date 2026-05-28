@@ -207,6 +207,37 @@
       </div>
     </section>
 
+    <!-- 商店頁 -->
+    <section id="view-shop" class="view">
+      <div class="shop-coins-bar">💰 金幣：<span id="shop-coins-val" class="coins-display">0</span></div>
+      <div class="shop-list">
+        <div class="shop-item-card">
+          <div class="shop-item-icon">🧪</div>
+          <div class="shop-item-info">
+            <div class="shop-item-name">HP 恢復藥水</div>
+            <div class="shop-item-desc">戰鬥中使用，恢復 1HP</div>
+          </div>
+          <button class="shop-buy-btn" data-item="potion" data-cost="1">💰1 購買</button>
+        </div>
+        <div class="shop-item-card">
+          <div class="shop-item-icon">📦</div>
+          <div class="shop-item-info">
+            <div class="shop-item-name">武器寶箱</div>
+            <div class="shop-item-desc">本階段限定武器碎片 ×1</div>
+          </div>
+          <button class="shop-buy-btn" data-item="weapon" data-cost="5">💰5 購買</button>
+        </div>
+        <div class="shop-item-card">
+          <div class="shop-item-icon">✨</div>
+          <div class="shop-item-info">
+            <div class="shop-item-name">EXP 強化書</div>
+            <div class="shop-item-desc">立即獲得角色 EXP +1</div>
+          </div>
+          <button class="shop-buy-btn" data-item="exp" data-cost="5">💰5 購買</button>
+        </div>
+      </div>
+    </section>
+
     <!-- 武器庫頁 -->
     <section id="view-weapon" class="view">
       <div class="weapon-page-header">
@@ -243,6 +274,9 @@
     </button>
     <button class="nav-btn" data-view="weapon">
       <span class="nav-icon">🗡️</span><span>武器庫</span>
+    </button>
+    <button class="nav-btn" data-view="shop">
+      <span class="nav-icon">🏪</span><span>商店</span>
     </button>
   </nav>
 

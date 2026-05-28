@@ -53,6 +53,8 @@ function selectUser(name) {
   progress = loadProgress();
   document.getElementById("user-picker-overlay").classList.add("hidden");
   document.getElementById("current-user-name").textContent = name;
+  checkDailyLogin();
+  updateCoinsDisplay();
   loadTodayWords();
   renderCard();
   const activeView = document.querySelector(".view.active");
@@ -113,7 +115,9 @@ function loadProgress() {
       }
     }
     if (p.char.equippedWeapon === undefined) p.char.equippedWeapon = null;
+    if (p.char.coins === undefined) p.char.coins = 0;
     if (!p.dailyTasks) p.dailyTasks = { date: "", enToZhDone: false, zhToEnDone: false };
+    if (!p.lastLoginDate) p.lastLoginDate = "";
     return p;
   } catch (e) {
     return newProgress();
@@ -128,8 +132,9 @@ function newProgress() {
     quizCorrect: 0,
     quizWrong: 0,
     shuffleOffset: 0,
-    char: { level: 1, exp: 0, maxHp: 3, equippedWeapon: null, weaponInventory: [], potions: 0, chests: 0, avatar: "🧙" },
-    dailyTasks: { date: "", enToZhDone: false, zhToEnDone: false }
+    char: { level: 1, exp: 0, maxHp: 3, equippedWeapon: null, weaponInventory: [], potions: 0, chests: 0, coins: 0, avatar: "🧙" },
+    dailyTasks: { date: "", enToZhDone: false, zhToEnDone: false },
+    lastLoginDate: ""
   };
 }
 function saveProgress(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
@@ -172,12 +177,13 @@ function switchView(view) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.getElementById(`view-${view}`).classList.add("active");
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-  const titles = { cards: "今日單字", quiz: "隨堂測驗", progress: "學習進度", char: "角色道具", weapon: "武器庫" };
+  const titles = { cards: "今日單字", quiz: "隨堂測驗", progress: "學習進度", char: "角色道具", weapon: "武器庫", shop: "商店" };
   document.getElementById("page-title").textContent = titles[view] || view;
   if (view === "progress") renderProgress();
   if (view === "quiz") resetQuizSetup();
   if (view === "char") renderCharPanel();
   if (view === "weapon") renderWeaponInventory();
+  if (view === "shop") renderShop();
 }
 
 // === 今日 10 字 ===
@@ -513,7 +519,15 @@ function finishQuiz() {
   else comment = "📚 需要再多複習這些字。";
   const killed = (battleState.sessionMonstersKilled || 0) + (battleState.hp <= 0 ? 1 : 0);
   let chestLine = "";
-  if (chestEarned) {
+  if (state.quiz.range === "learned") {
+    const killCoins = killed * 2;
+    let perfectBonus = "";
+    if (state.quiz.correct === total) {
+      addCoins(10);
+      perfectBonus = `<br><span style="color:#f4a261;font-size:0.95rem">🌟 全對獎勵！💰+10 金幣</span>`;
+    }
+    chestLine = `<br><span style="color:#f4a261;font-size:0.95rem">💰 擊殺獎勵：+${killCoins} 金幣（${killed} 隻）</span>${perfectBonus}`;
+  } else if (chestEarned) {
     chestLine = `<br><span style="color:#f4a261;font-size:0.95rem">📦 任務達成！獲得寶箱 ×1（本場擊敗 ${killed} 隻怪物）</span>`;
   } else if (killed < 2) {
     chestLine = `<br><span style="color:var(--text-light);font-size:0.9rem">本場擊敗 ${killed}/2 隻怪物，未達任務條件</span>`;
@@ -637,7 +651,7 @@ function getLearnedMonsterTier() {
 }
 function getMonsterMaxHp() {
   if (state.quiz && state.quiz.range === "learned") {
-    return 10 + getLearnedMonsterTier() * 2;
+    return 30 + getLearnedMonsterTier() * 2;
   }
   const HP_STAGES = [10, 15, 20, 25, 30, 35, 40, 45, 50];
   return HP_STAGES[getMonsterStage()];
@@ -1025,6 +1039,14 @@ function triggerAttack(isCritical) {
       arenaEl.appendChild(flash);
       setTimeout(() => flash.remove(), 400);
     }
+    // 武器特效：攻擊斬線
+    if (arenaEl) {
+      const slash = document.createElement("div");
+      slash.className = "weapon-slash-streak" + (isCritical ? " slash-crit" : "");
+      slash.style.background = `linear-gradient(90deg,transparent,${wt.color},#fff,${wt.color},transparent)`;
+      arenaEl.appendChild(slash);
+      setTimeout(() => slash.remove(), 380);
+    }
     const atk = getPlayerAttack();
     let dmg = isCritical ? atk * 2 : atk;
     if (isCritical) {
@@ -1122,7 +1144,120 @@ const EXP_PER_LEVEL = 10;
 const LEVELS_PER_HP_UP = 5;
 
 function ensureChar() {
-  if (!progress.char) progress.char = { level: 1, exp: 0, maxHp: 3, weapon: null, potions: 0, chests: 0 };
+  if (!progress.char) progress.char = { level: 1, exp: 0, maxHp: 3, weapon: null, potions: 0, chests: 0, coins: 0 };
+  if (progress.char.coins === undefined) progress.char.coins = 0;
+}
+
+function addCoins(amount) {
+  ensureChar();
+  progress.char.coins = (progress.char.coins || 0) + amount;
+  saveProgress(progress);
+  updateCoinsDisplay();
+}
+
+function updateCoinsDisplay() {
+  const val = (progress.char && progress.char.coins) || 0;
+  document.querySelectorAll(".coins-display").forEach(el => el.textContent = val);
+}
+
+function checkDailyLogin() {
+  const today = todayDateString();
+  if (progress.lastLoginDate === today) return;
+  progress.lastLoginDate = today;
+  ensureChar();
+  progress.char.chests++;
+  saveProgress(progress);
+  const toast = document.getElementById("challenge-toast");
+  if (toast) {
+    toast.textContent = "🎁 每日登入獎勵！獲得寶箱 ×1";
+    toast.classList.remove("hidden", "show");
+    void toast.offsetWidth;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.add("hidden"), 2800);
+  }
+}
+
+function giveLevelUpWeapons() {
+  ensureChar();
+  const stage = getMonsterStage();
+  const pool = STAGE_WEAPON_POOLS[stage] || ["dagger"];
+  const typeKey = pool[Math.floor(Math.random() * pool.length)];
+  const wt = getWeaponTypeData(typeKey);
+  const atk = Math.max(1, stage);
+  const inv = progress.char.weaponInventory || [];
+  let upgradeText = "";
+  for (let i = 0; i < 2; i++) {
+    const existing = inv.find(x => x.type === typeKey);
+    if (existing) {
+      existing.attack = Math.max(existing.attack, atk);
+      existing.count = (existing.count || 0) + 1;
+      if (existing.count >= 10) {
+        existing.count -= 10;
+        existing.level = (existing.level || 0) + 1;
+        upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
+      }
+    } else {
+      inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
+      if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
+    }
+  }
+  progress.char.weaponInventory = inv;
+  saveProgress(progress);
+  showChestModal("🆙", `升級獎勵！獲得 ${wt.emoji}${wt.name} 碎片 ×2${upgradeText}`);
+}
+
+function renderShop() {
+  const coins = (progress.char && progress.char.coins) || 0;
+  document.querySelectorAll(".coins-display").forEach(el => el.textContent = coins);
+  const shopCoins = document.getElementById("shop-coins-val");
+  if (shopCoins) shopCoins.textContent = coins;
+}
+
+function buyItem(item, cost) {
+  ensureChar();
+  const coins = progress.char.coins || 0;
+  if (coins < cost) { alert(`金幣不足！需要 💰${cost}，目前 💰${coins}`); return; }
+  progress.char.coins -= cost;
+  if (item === "potion") {
+    progress.char.potions++;
+    saveProgress(progress);
+    updateCoinsDisplay();
+    renderShop();
+    alert(`購買成功！🧪 HP 藥水 ×1（目前 ${progress.char.potions} 瓶）`);
+  } else if (item === "weapon") {
+    const stage = getMonsterStage();
+    const pool = STAGE_WEAPON_POOLS[stage] || ["dagger"];
+    const typeKey = pool[Math.floor(Math.random() * pool.length)];
+    const wt = getWeaponTypeData(typeKey);
+    const atk = Math.max(1, stage);
+    const inv = progress.char.weaponInventory || [];
+    const existing = inv.find(x => x.type === typeKey);
+    let upgradeText = "";
+    if (existing) {
+      existing.attack = Math.max(existing.attack, atk);
+      existing.count = (existing.count || 0) + 1;
+      if (existing.count >= 10) {
+        existing.count -= 10;
+        existing.level = (existing.level || 0) + 1;
+        upgradeText = `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
+      }
+    } else {
+      inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
+      if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
+    }
+    progress.char.weaponInventory = inv;
+    saveProgress(progress);
+    updateCoinsDisplay();
+    renderShop();
+    showChestModal(wt.emoji, `${wt.name} 碎片 ×1${upgradeText}`);
+  } else if (item === "exp") {
+    saveProgress(progress);
+    const leveled = addExp(1);
+    updateCoinsDisplay();
+    renderShop();
+    if (leveled) renderCharPanel();
+    alert(`購買成功！✨ EXP +1${leveled ? `\n🎉 升級！Lv.${progress.char.level}` : ""}`);
+  }
 }
 function ensureDailyTasks() {
   const today = todayDateString();
@@ -1148,6 +1283,7 @@ function addExp(amount) {
     if (progress.char.level % LEVELS_PER_HP_UP === 0) progress.char.maxHp++;
   }
   saveProgress(progress);
+  if (leveled) setTimeout(() => giveLevelUpWeapons(), 400);
   return leveled;
 }
 
@@ -1275,6 +1411,13 @@ function onMonsterKilled() {
     extendTimer(secs * 1000);
     showBattleEffect(`✨魔力+${secs}s`, "#a29bfe");
   }
+  // 熟記模式：每殺一隻怪物給 2 金幣
+  if (state.quiz && state.quiz.range === "learned") {
+    addCoins(2);
+    showBattleEffect("💰+2", "#f4a261");
+    return;
+  }
+  // 一般模式：3 隻後額外給寶箱
   if (battleState.sessionMonstersKilled >= 3) {
     ensureDailyTasks(); ensureChar();
     const bonusKey = state.quiz.mode === "en-to-zh" ? "bonusKillsEnToZh" : "bonusKillsZhToEn";
@@ -1301,7 +1444,7 @@ function showBattleChestBonus() {
 }
 
 function checkSessionChallenge(mode) {
-  // battleState.hp <= 0 means a kill animation is still playing; count it as a pending kill
+  if (state.quiz && state.quiz.range === "learned") return false;
   const pendingKill = battleState.hp <= 0 ? 1 : 0;
   const totalKilled = (battleState.sessionMonstersKilled || 0) + pendingKill;
   if (totalKilled < 2) return false;
@@ -1519,5 +1662,14 @@ document.getElementById("back-to-today").addEventListener("click", () => {
   document.getElementById("quiz-use-potion-btn").addEventListener("click", usePotion);
   document.getElementById("chest-close-btn").addEventListener("click", () => {
     document.getElementById("chest-modal").classList.add("hidden");
+  });
+
+  // 商店按鈕
+  document.querySelectorAll(".shop-buy-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const item = btn.dataset.item;
+      const cost = parseInt(btn.dataset.cost, 10);
+      buyItem(item, cost);
+    });
   });
 });
