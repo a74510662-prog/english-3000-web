@@ -507,13 +507,11 @@ function answerQuestion(btn, isCorrect, q) {
         return;
       }
       if (!gameEl || gameEl.classList.contains("hidden")) return;
-      const dragonDmg = getDragonDamage();
-      const isCrit = dragonDmg > 6;
-      showBattleEffect(isCrit ? `🔥巨龍爆擊！-${dragonDmg}` : `🔥巨龍吐火 -${dragonDmg}`, "#ff4500");
+      showBattleEffect("🔥巨龍吐火！-15", "#ff4500");
       setTimeout(() => {
         if (battleState.playerHp <= 0) return;
         if (!gameEl || gameEl.classList.contains("hidden")) return;
-        triggerMonsterAttack(dragonDmg);
+        triggerMonsterAttack(15);
         if (isLastQ) {
           setTimeout(() => {
             if (battleState.playerHp > 0) document.getElementById("next-question").classList.remove("hidden");
