@@ -1330,7 +1330,7 @@ function triggerMonsterAttack(overrideDamage) {
       showBattleEffect(`🛡️-${absorbed}`, "#ffd700");
       updateShieldDisplay();
     }
-    if (battleState.armorShield > 0) {
+    if (battleState.armorShield > 0 && state.quiz?.range !== "all") {
       battleState.armorShield--;
       const rem = battleState.armorShield > 0 ? `(剩${battleState.armorShield})` : "";
       showBattleEffect(`🌸護盾${rem}`, "#fd79a8");
