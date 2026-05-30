@@ -325,6 +325,23 @@ function updateStreak() {
     else if (diffDays > 1) progress.streak = 1;
   }
   progress.lastStudyDate = today;
+  if (progress.streak > 0 && progress.streak % 7 === 0) {
+    setTimeout(() => giveArmorStreakReward(), 800);
+  }
+}
+
+function giveArmorStreakReward() {
+  ensureChar();
+  if (!progress.char.armorInventory) progress.char.armorInventory = [];
+  const armor = ARMORS[Math.floor(Math.random() * ARMORS.length)];
+  progress.char.armorInventory.push({ type: armor.key });
+  if (!progress.char.equippedArmor) progress.char.equippedArmor = armor.key;
+  saveProgress(progress);
+  showChestModal(armor.emoji,
+    `🎉 連續學習 ${progress.streak} 天！<br>` +
+    `獲得防具：${armor.emoji} <strong>${armor.name}</strong><br>` +
+    `<span style="font-size:0.85rem;color:var(--text-light)">${armor.desc}</span>`
+  );
 }
 
 // === 測驗 ===
@@ -447,7 +464,7 @@ function answerQuestion(btn, isCorrect, q) {
   const weaponType = weaponItem?.type;
   const wBonus = getWeaponBonus(weaponItem);
   // 火焰劍：爆擊機率隨等級提升
-  const fireCrit = weaponType === "fire" && isCorrect && Math.random() < (0.15 + wBonus * 0.05);
+  const fireCrit = weaponType === "fire" && isCorrect && Math.random() < (0.15 + wBonus * 0.05 + getMagicCloakProbBonus());
   const isCritical = isCorrect && (elapsed <= getCriticalMs() || fireCrit);
   stopQuestionTimer();
 
@@ -724,6 +741,11 @@ function resetAllProgress() {
 // === 戰鬥系統 ===
 const MONSTERS = ["👹", "🐉", "💀", "🧟", "👾", "🦇", "🐺", "🧌", "🦂", "👻"];
 const AVATARS = ["🧙","🧝","🦸","🧜","🧚","🧞","🦊","🐱","🐶","🐼","🦁","🐯","🐸","🐧","🐺","🦅"];
+const ARMORS = [
+  { key: "paradise_cape", name: "樂園披風", emoji: "🌸", desc: "單場次抵禦怪物攻擊一次" },
+  { key: "dragon_coat",   name: "龍紋外套", emoji: "🐲", desc: "攻擊力+1、防禦+1（每次傷害減少1）" },
+  { key: "magic_cloak",   name: "魔法斗篷", emoji: "🔮", desc: "武器效果提升：攻擊+1且機率+5%" },
+];
 
 const WEAPON_TYPES = [
   { key: "dagger",    name: "匕首",     emoji: "🗡️",  hit: ["⚔️"],        color: "#b2bec3", special: "⚡速攻：25% 機率追加 -1 攻擊" },
@@ -784,11 +806,28 @@ function getMonsterAttack() {
 function getPlayerMaxHp() {
   return (progress.char && progress.char.maxHp) ? progress.char.maxHp : 3;
 }
+function getEquippedArmorType() {
+  return (progress.char && progress.char.equippedArmor) || null;
+}
+function getArmorData(key) {
+  return ARMORS.find(a => a.key === key) || null;
+}
+function getArmorAttackBonus() {
+  const a = getEquippedArmorType();
+  return (a === "dragon_coat" || a === "magic_cloak") ? 1 : 0;
+}
+function getArmorDefense() {
+  return getEquippedArmorType() === "dragon_coat" ? 1 : 0;
+}
+function getMagicCloakProbBonus() {
+  return getEquippedArmorType() === "magic_cloak" ? 0.05 : 0;
+}
 function getPlayerAttack() {
-  if (!progress.char || !progress.char.equippedWeapon) return 1;
+  const armorAtk = getArmorAttackBonus();
+  if (!progress.char || !progress.char.equippedWeapon) return 1 + armorAtk;
   const w = (progress.char.weaponInventory || []).find(x => x.type === progress.char.equippedWeapon);
-  if (!w) return 1;
-  return 1 + (w.attack || 0) + (w.level || 0);
+  if (!w) return 1 + armorAtk;
+  return 1 + (w.attack || 0) + (w.level || 0) + armorAtk;
 }
 
 function getEquippedWeaponItem() {
@@ -819,13 +858,13 @@ function getWeaponSpecialDesc(wt, item) {
   }
 }
 
-let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0 };
+let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: 0 };
 let questionStartTime = null;
 let timerInterval = null;
 
 function initBattle() {
   const mHp = getMonsterMaxHp();
-  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0 };
+  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: getEquippedArmorType() === "paradise_cape" ? 1 : 0 };
   const mChar = document.getElementById("monster-char");
   if (mChar) { mChar.textContent = state.quiz?.range === "all" ? "🐉" : MONSTERS[0]; mChar.className = "battle-char"; }
   const pChar = document.getElementById("player-char");
@@ -1222,7 +1261,7 @@ function triggerAttack(isCritical) {
         return;
       }
       // 匕首：爆擊速攻（隨等級提升觸發機率）
-      if (isCritical && wt.key === "dagger" && Math.random() < (0.25 + wBonus * 0.05)) {
+      if (isCritical && wt.key === "dagger" && Math.random() < (0.25 + wBonus * 0.05 + getMagicCloakProbBonus())) {
         setTimeout(() => {
           if (battleState.hp <= 0) return;
           battleState.hp = Math.max(0, battleState.hp - 1);
@@ -1261,6 +1300,12 @@ function triggerMonsterAttack(overrideDamage) {
       showBattleEffect(`🛡️-${absorbed}`, "#ffd700");
       updateShieldDisplay();
     }
+    if (battleState.armorShield > 0) {
+      battleState.armorShield = 0;
+      showBattleEffect("🌸 護盾！", "#fd79a8");
+      monsterDmg = 0;
+    }
+    monsterDmg = Math.max(0, monsterDmg - getArmorDefense());
     battleState.playerHp = Math.max(0, battleState.playerHp - monsterDmg);
     updatePlayerHP();
     shakeArena(false);
@@ -1298,6 +1343,8 @@ const MAX_LEVEL = 999;
 function ensureChar() {
   if (!progress.char) progress.char = { level: 1, exp: 0, maxHp: 3, weapon: null, potions: 0, chests: 0, coins: 0 };
   if (progress.char.coins === undefined) progress.char.coins = 0;
+  if (progress.char.armorInventory === undefined) progress.char.armorInventory = [];
+  if (progress.char.equippedArmor === undefined) progress.char.equippedArmor = null;
 }
 
 function addCoins(amount) {
@@ -1848,7 +1895,8 @@ function renderCharPanel() {
   } else {
     set("char-weapon", "無");
   }
-  set("char-armor", "無");
+  const equippedArmorData = getArmorData(getEquippedArmorType());
+  set("char-armor", equippedArmorData ? `${equippedArmorData.emoji} ${equippedArmorData.name}` : "無");
   set("inv-potions", c.potions);
   set("inv-chests", c.chests);
   set("inv-rainbow", c.rainbowTickets || 0);
