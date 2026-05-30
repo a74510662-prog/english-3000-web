@@ -857,7 +857,8 @@ function getMonsterAttack() {
   return getMonsterStage() + 1;
 }
 function getPlayerMaxHp() {
-  const base = (progress.char && progress.char.maxHp) ? progress.char.maxHp : 3;
+  const level = progress.char?.level || 1;
+  const base = 3 + Math.floor(Math.sqrt(level) * 7.3);
   return base + getClassHpBonus();
 }
 // === 職業系統 ===
@@ -1700,7 +1701,6 @@ function addExp(amount) {
     progress.char.exp -= EXP_PER_LEVEL;
     progress.char.level++;
     leveled = true;
-    if (progress.char.level % LEVELS_PER_HP_UP === 0) progress.char.maxHp++;
   }
   if (progress.char.level >= MAX_LEVEL) progress.char.exp = 0;
   saveProgress(progress);
@@ -1743,7 +1743,7 @@ function openChest() {
     const leveled = addExp(1);
     emoji = "✨";
     text = leveled
-      ? `獲得 EXP +1！<br>🎉 升級！現在 Lv.${progress.char.level}${progress.char.level % LEVELS_PER_HP_UP === 0 ? "<br>💪 最大 HP +1！" : ""}`
+      ? `獲得 EXP +1！<br>🎉 升級！現在 Lv.${progress.char.level}（HP ${getPlayerMaxHp()}）`
       : `獲得 EXP +1<br>（${progress.char.exp} / ${EXP_PER_LEVEL}）`;
   } else if (roll < 0.65) {
     progress.char.potions++;
@@ -2001,7 +2001,7 @@ function renderCharPanel() {
   }
   set("char-level", c.level);
   set("char-exp-text", `${c.exp} / ${EXP_PER_LEVEL}`);
-  set("char-max-hp", c.maxHp);
+  set("char-max-hp", getPlayerMaxHp());
   set("char-attack", getPlayerAttack());
   const equippedItem = getEquippedWeaponItem();
   if (equippedItem) {
@@ -2034,9 +2034,10 @@ function renderCharPanel() {
   const learnedAtk = 1 + Math.floor(learnedTier / 25);
   const learnedCount = Math.min((progress.learnedIds || []).length, 3000);
   const nextHpLevel = (Math.floor((c.level || 1) / LEVELS_PER_HP_UP) + 1) * LEVELS_PER_HP_UP;
+  const currentMaxHp = getPlayerMaxHp();
   if (mhpInfo) mhpInfo.innerHTML =
-    `HP 成長：每 12 級 +1（Lv.504 ≈ 44HP 可扛龍火，Lv.999 最高 86HP）<br>` +
-    `下次 HP 提升：Lv.${nextHpLevel}（目前 ${c.maxHp} HP）<br>` +
+    `HP 成長：√等級 × 7.3（Lv.150 ≈ 92HP 可扛龍火，Lv.999 最高 233HP）<br>` +
+    `目前最大 HP：${currentMaxHp}（含職業加成）<br>` +
     `一般模式怪物：${days} 天，上限 50HP｜熟記模式怪物：${learnedHp}HP（${learnedCount} 字）`;
   renderClassPanel();
 }
