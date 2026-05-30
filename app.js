@@ -1898,7 +1898,6 @@ document.getElementById("back-to-today").addEventListener("click", () => {
     });
   });
   document.getElementById("next-question").addEventListener("click", nextQuestion);
-  document.getElementById("quit-quiz").addEventListener("click", resetQuizSetup);
   document.getElementById("quiz-restart").addEventListener("click", resetQuizSetup);
   document.getElementById("defeat-restart").addEventListener("click", resetQuizSetup);
 
