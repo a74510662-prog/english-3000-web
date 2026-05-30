@@ -335,7 +335,7 @@ function resetQuizSetup() {
   document.getElementById("quiz-result").classList.add("hidden");
   document.getElementById("quiz-defeat").classList.add("hidden");
   document.querySelectorAll(".quiz-mode-group button, .quiz-range-group button").forEach(b => b.classList.remove("active"));
-  state.quiz = { mode: null, range: null, questions: [], idx: 0, correct: 0 };
+  state.quiz = { mode: null, range: null, questions: [], idx: 0, correct: 0, coinsEarned: 0 };
 }
 
 function buildAllPoolQuestions(count) {
@@ -381,6 +381,7 @@ function tryStartQuiz() {
   state.quiz.pool = pool;
   state.quiz.idx = 0;
   state.quiz.correct = 0;
+  state.quiz.coinsEarned = 0;
   document.getElementById("quiz-setup").classList.add("hidden");
   document.getElementById("quiz-game").classList.remove("hidden");
   initBattle();
@@ -460,6 +461,17 @@ function answerQuestion(btn, isCorrect, q) {
     state.quiz.correct++;
     progress.quizCorrect++;
     battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
+    // 答對 +1 金幣，每日上限 20 枚（按測驗模式分開計算）
+    ensureDailyTasks();
+    const coinKey = state.quiz.mode === "en-to-zh" ? "dailyCoinEnToZh" : "dailyCoinZhToEn";
+    const todayCoins = progress.dailyTasks[coinKey] || 0;
+    if (todayCoins < 20) {
+      addCoins(1);
+      progress.dailyTasks[coinKey] = todayCoins + 1;
+      saveProgress(progress);
+      state.quiz.coinsEarned = (state.quiz.coinsEarned || 0) + 1;
+      showBattleEffect("💰+1", "#f4a261");
+    }
     if (isCritical) {
       // 龍魂聖劍：每 5 次爆擊治癒（隨等級增加回復量）
       if (weaponType === "holy" && battleState.consecutiveCorrect % 5 === 0) {
@@ -597,27 +609,42 @@ function finishQuiz() {
   else comment = "📚 需要再多複習這些字。";
   const killed = (battleState.sessionMonstersKilled || 0) + (battleState.hp <= 0 ? 1 : 0);
   let chestLine = "";
-  if (state.quiz.range === "learned") {
-    const killCoins = killed * 2;
-    let perfectBonus = "";
-    if (state.quiz.correct === total) {
+  // 答對金幣顯示（所有模式）
+  const sessionCoins = state.quiz.coinsEarned || 0;
+  const coinKey = state.quiz.mode === "en-to-zh" ? "dailyCoinEnToZh" : "dailyCoinZhToEn";
+  const todayTotal = (progress.dailyTasks && progress.dailyTasks[coinKey]) || 0;
+  const atCap = todayTotal >= 20;
+  let coinLine = sessionCoins > 0
+    ? `<br><span style="color:#f4a261;font-size:0.95rem">💰 本場獲得 +${sessionCoins} 金幣${atCap ? "（今日已達上限 20 枚）" : `（今日累計 ${todayTotal}/20）`}</span>`
+    : atCap ? `<br><span style="color:var(--text-light);font-size:0.9rem">💰 今日此測驗金幣已達上限 20 枚</span>` : "";
+  // 全對獎勵（英譯中／中譯英各每日一次）
+  let perfectLine = "";
+  if (state.quiz.correct === total && (state.quiz.mode === "en-to-zh" || state.quiz.mode === "zh-to-en")) {
+    ensureDailyTasks();
+    const perfKey = state.quiz.mode === "en-to-zh" ? "perfectCoinEnToZh" : "perfectCoinZhToEn";
+    if (!progress.dailyTasks[perfKey]) {
       addCoins(10);
-      perfectBonus = `<br><span style="color:#f4a261;font-size:0.95rem">🌟 全對獎勵！💰+10 金幣</span>`;
+      progress.dailyTasks[perfKey] = true;
+      saveProgress(progress);
+      perfectLine = `<br><span style="color:#f4a261;font-size:0.95rem">🌟 全對獎勵！💰+10 金幣</span>`;
+    } else {
+      perfectLine = `<br><span style="color:var(--text-light);font-size:0.9rem">🌟 全對！（今日全對獎勵已領取）</span>`;
     }
-    chestLine = `<br><span style="color:#f4a261;font-size:0.95rem">💰 擊殺獎勵：+${killCoins} 金幣（${killed} 隻）</span>${perfectBonus}`;
-  } else if (state.quiz.range === "all") {
+  }
+  chestLine = coinLine + perfectLine;
+  if (state.quiz.range === "all") {
     if (state.quiz.correct === total) {
       ensureChar();
       progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 1;
       saveProgress(progress);
-      chestLine = `<br><span style="color:#a29bfe;font-size:0.95rem">🌈 25 題全對！獲得彩虹券 ×1（目前 ${progress.char.rainbowTickets} 張）</span>`;
+      chestLine += `<br><span style="color:#a29bfe;font-size:0.95rem">🌈 25 題全對！獲得彩虹券 ×1（目前 ${progress.char.rainbowTickets} 張）</span>`;
     } else {
-      chestLine = `<br><span style="color:var(--text-light);font-size:0.9rem">答對 ${state.quiz.correct}/${total} 題，25 題全對可獲得 🌈 彩虹券</span>`;
+      chestLine += `<br><span style="color:var(--text-light);font-size:0.9rem">答對 ${state.quiz.correct}/${total} 題，25 題全對可獲得 🌈 彩虹券</span>`;
     }
   } else if (chestEarned) {
-    chestLine = `<br><span style="color:#f4a261;font-size:0.95rem">📦 任務達成！獲得寶箱 ×1（本場全對！）</span>`;
-  } else if (state.quiz.correct < total) {
-    chestLine = `<br><span style="color:var(--text-light);font-size:0.9rem">答對 ${state.quiz.correct}/${total} 題，需全對才達成每日任務</span>`;
+    chestLine += `<br><span style="color:#f4a261;font-size:0.95rem">📦 任務達成！獲得寶箱 ×1（本場全對！）</span>`;
+  } else if (state.quiz.correct < total && state.quiz.range === "today") {
+    chestLine += `<br><span style="color:var(--text-light);font-size:0.9rem">答對 ${state.quiz.correct}/${total} 題，需全對才達成每日任務</span>`;
   }
   document.getElementById("quiz-score").innerHTML = `
     答對 <strong>${state.quiz.correct}</strong> / ${total} 題 (${pct}%)<br>
@@ -1485,13 +1512,17 @@ function buyItem(item, cost) {
 function ensureDailyTasks() {
   const today = todayDateString();
   if (!progress.dailyTasks || progress.dailyTasks.date !== today) {
-    progress.dailyTasks = { date: today, enToZhDone: false, zhToEnDone: false, monstersKilled: 0, challengeDone: false, bonusKillsEnToZh: 0, bonusKillsZhToEn: 0 };
+    progress.dailyTasks = { date: today, enToZhDone: false, zhToEnDone: false, monstersKilled: 0, challengeDone: false, bonusKillsEnToZh: 0, bonusKillsZhToEn: 0, dailyCoinEnToZh: 0, dailyCoinZhToEn: 0, perfectCoinEnToZh: false, perfectCoinZhToEn: false };
     saveProgress(progress);
   } else {
     if (progress.dailyTasks.monstersKilled === undefined) progress.dailyTasks.monstersKilled = 0;
     if (progress.dailyTasks.challengeDone === undefined) progress.dailyTasks.challengeDone = false;
     if (progress.dailyTasks.bonusKillsEnToZh === undefined) progress.dailyTasks.bonusKillsEnToZh = 0;
     if (progress.dailyTasks.bonusKillsZhToEn === undefined) progress.dailyTasks.bonusKillsZhToEn = 0;
+    if (progress.dailyTasks.dailyCoinEnToZh === undefined) progress.dailyTasks.dailyCoinEnToZh = 0;
+    if (progress.dailyTasks.dailyCoinZhToEn === undefined) progress.dailyTasks.dailyCoinZhToEn = 0;
+    if (progress.dailyTasks.perfectCoinEnToZh === undefined) progress.dailyTasks.perfectCoinEnToZh = false;
+    if (progress.dailyTasks.perfectCoinZhToEn === undefined) progress.dailyTasks.perfectCoinZhToEn = false;
   }
 }
 
@@ -1654,12 +1685,6 @@ function onMonsterKilled() {
     setTimeout(() => {
       showChestModal("🐉", `討伐巨龍成功！<br>獲得 🌈 彩虹券 ×10<br><span style="font-size:0.85rem;color:#ffd700">傳說成就解鎖！</span>`);
     }, 1000);
-    return;
-  }
-  // 熟記模式：每殺一隻怪物給 2 金幣
-  if (state.quiz && state.quiz.range === "learned") {
-    addCoins(2);
-    showBattleEffect("💰+2", "#f4a261");
     return;
   }
   // 一般模式：3 隻後額外給寶箱
