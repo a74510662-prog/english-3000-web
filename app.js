@@ -625,10 +625,10 @@ function finishQuiz() {
     ensureDailyTasks();
     const perfKey = state.quiz.mode === "en-to-zh" ? "perfectCoinEnToZh" : "perfectCoinZhToEn";
     if (!progress.dailyTasks[perfKey]) {
-      addCoins(10);
+      addCoins(5);
       progress.dailyTasks[perfKey] = true;
       saveProgress(progress);
-      perfectLine = `<br><span style="color:#f4a261;font-size:0.95rem">🌟 全對獎勵！💰+10 金幣</span>`;
+      perfectLine = `<br><span style="color:#f4a261;font-size:0.95rem">🌟 全對獎勵！💰+5 金幣</span>`;
     } else {
       perfectLine = `<br><span style="color:var(--text-light);font-size:0.9rem">🌟 全對！（今日全對獎勵已領取）</span>`;
     }
@@ -1677,6 +1677,12 @@ function onMonsterKilled() {
     const secs = 4 + wBonus;
     extendTimer(secs * 1000);
     showBattleEffect(`✨魔力+${secs}s`, "#a29bfe");
+  }
+  // 熟記模式：每殺一隻怪物給 2 金幣
+  if (state.quiz && state.quiz.range === "learned") {
+    addCoins(2);
+    showBattleEffect("💰+2", "#f4a261");
+    return;
   }
   // 全字池模式：擊殺巨龍獎勵 100 張彩虹券
   if (state.quiz && state.quiz.range === "all") {
