@@ -886,6 +886,24 @@ body {
 }
 .class-lock-icon { font-size: 1.6rem; }
 .class-lock-text { font-size: 0.88rem; color: var(--text-light); letter-spacing: 0.04em; }
+.class-equipped-row {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px; background: var(--primary-light);
+  border-radius: 10px; margin-bottom: 10px;
+}
+.class-badge { font-size: 1rem; font-weight: bold; color: white; }
+.class-skill-desc { font-size: 0.82rem; color: rgba(255,255,255,0.9); }
+.class-next-lv { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
+.class-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.class-item {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 6px; border-radius: 8px; font-size: 0.82rem;
+  border: 1.5px solid var(--border); background: white; cursor: pointer;
+}
+.class-item.equipped { border-color: var(--primary); background: #eef2ff; }
+.class-item.locked { opacity: 0.4; cursor: default; }
+.class-item-name { font-size: 0.85rem; font-weight: bold; }
+.class-item-lv { font-size: 0.75rem; color: var(--primary); }
 .task-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;

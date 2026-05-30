@@ -307,6 +307,7 @@ function markTodayDone() {
       if (!progress.learnedIds.includes(w.id)) progress.learnedIds.push(w.id);
     });
     updateStreak();
+    checkClassUnlocks();
   }
   saveProgress(progress);
   updateMarkDoneBtn();
@@ -760,6 +761,45 @@ const ARMORS = [
   { key: "magic_cloak",   name: "魔法斗篷", emoji: "🔮", desc: "武器效果提升：攻擊+1且機率+5%" },
 ];
 
+const CLASSES = [
+  { key: "shadow_blade", name: "影刃", emoji: "🗡️", weapon: "dagger",
+    stats: { hp: 0, atk: 2, def: 0 },
+    skillDesc: lv => `速攻追加傷害 -${lv + 1}` },
+  { key: "ranger", name: "遊俠", emoji: "🏹", weapon: "bow",
+    stats: { hp: 0, atk: 1, def: 1 },
+    skillDesc: lv => `答對穿透 +${lv} 固定傷害` },
+  { key: "sorcerer", name: "術士", emoji: "🪄", weapon: "staff",
+    stats: { hp: 1, atk: 0, def: 1 },
+    skillDesc: lv => `每題消除 ${lv} 個錯誤選項` },
+  { key: "hunter", name: "獵人", emoji: "🪃", weapon: "boomerang",
+    stats: { hp: 0, atk: 2, def: -1 },
+    skillDesc: lv => `連答 ${lv <= 2 ? 3 : 2} 題，傷害 ×${lv + 1}` },
+  { key: "guardian", name: "鐵衛", emoji: "⚒️", weapon: "hammer",
+    stats: { hp: 3, atk: 0, def: 2 },
+    skillDesc: lv => `每場戰鬥開始 HP +${lv}` },
+  { key: "sea_god", name: "海神", emoji: "🔱", weapon: "trident",
+    stats: { hp: 0, atk: 1, def: 1 },
+    skillDesc: lv => `中毒最多疊 ${lv + 1} 層` },
+  { key: "flame", name: "炎武", emoji: "🔥", weapon: "fire",
+    stats: { hp: 0, atk: 3, def: -1 },
+    skillDesc: lv => `連答 3 題觸發全場燃燒，持續 ${lv + 1} 題` },
+  { key: "ice_spirit", name: "冰靈", emoji: "❄️", weapon: "ice",
+    stats: { hp: 1, atk: 1, def: 1 },
+    skillDesc: lv => `凍結期間傷害 ×${lv + 1}` },
+  { key: "thunder", name: "雷霸", emoji: "⚡", weapon: "thunder",
+    stats: { hp: 1, atk: 2, def: 0 },
+    skillDesc: lv => `爆擊後 ${30 + lv * 10}% 機率連鎖閃電` },
+  { key: "shadow", name: "暗影", emoji: "🌙", weapon: "dark",
+    stats: { hp: -1, atk: 2, def: 0 },
+    skillDesc: lv => `連殺吸血遞增，起始 +${lv}` },
+  { key: "paladin", name: "聖騎", emoji: "💎", weapon: "holy",
+    stats: { hp: 2, atk: 0, def: 2 },
+    skillDesc: lv => `每 ${Math.max(1, 4 - lv)} 題答對回血 1` },
+  { key: "dragon_heir", name: "龍裔", emoji: "🐉", weapon: "dragon_sword",
+    stats: { hp: 1, atk: 3, def: 1 },
+    skillDesc: lv => `護盾蓄滿 ${Math.max(2, 10 - lv * 2)} HP 自動爆擊` },
+];
+
 const WEAPON_TYPES = [
   { key: "dagger",    name: "匕首",     emoji: "🗡️",  hit: ["⚔️"],        color: "#b2bec3", special: "⚡速攻：25% 機率追加 -1 攻擊" },
   { key: "bow",       name: "弓箭",     emoji: "🏹",  hit: ["🏹"],        color: "#00b894", projectile: true,  projEmoji: "➤",  special: "🏹穿透：答對額外 +1 傷害" },
@@ -817,8 +857,46 @@ function getMonsterAttack() {
   return getMonsterStage() + 1;
 }
 function getPlayerMaxHp() {
-  return (progress.char && progress.char.maxHp) ? progress.char.maxHp : 3;
+  const base = (progress.char && progress.char.maxHp) ? progress.char.maxHp : 3;
+  return base + getClassHpBonus();
 }
+// === 職業系統 ===
+function getClassDef(key) { return CLASSES.find(c => c.key === key) || null; }
+function getEquippedClassKey() { return progress.char?.equippedClass || null; }
+function getEquippedClassDef() { return getClassDef(getEquippedClassKey()); }
+function getClassLevel(key) {
+  const data = progress.char?.classes?.[key];
+  if (!data?.unlocked) return 0;
+  const learned = Math.min((progress.learnedIds || []).length, 3000);
+  return Math.min(5, Math.floor((learned - data.unlockWordCount) / 150) + 1);
+}
+function getEquippedClassLevel() {
+  const key = getEquippedClassKey();
+  return key ? getClassLevel(key) : 0;
+}
+function getClassStatBonus(stat) {
+  const cls = getEquippedClassDef();
+  if (!cls) return 0;
+  const lv = getEquippedClassLevel();
+  if (lv === 0) return 0;
+  const base = cls.stats[stat] || 0;
+  return base > 0 ? base + (lv - 1) : base;
+}
+function checkClassUnlocks() {
+  const learned = (progress.learnedIds || []).length;
+  if (learned < 50) return;
+  ensureChar();
+  if (!progress.char.classes) progress.char.classes = {};
+  CLASSES.forEach(cls => {
+    if (progress.char.classes[cls.key]?.unlocked) return;
+    const hasWeapon = (progress.char.weaponInventory || []).some(w => w.type === cls.weapon);
+    if (hasWeapon) {
+      progress.char.classes[cls.key] = { unlocked: true, unlockWordCount: learned };
+      saveProgress(progress);
+    }
+  });
+}
+
 function getEquippedArmorType() {
   return (progress.char && progress.char.equippedArmor) || null;
 }
@@ -854,11 +932,14 @@ function getMagicCloakProbBonus() {
 }
 function getPlayerAttack() {
   const armorAtk = getArmorAttackBonus();
-  if (!progress.char || !progress.char.equippedWeapon) return 1 + armorAtk;
+  const classAtk = getClassStatBonus("atk");
+  if (!progress.char || !progress.char.equippedWeapon) return 1 + armorAtk + classAtk;
   const w = (progress.char.weaponInventory || []).find(x => x.type === progress.char.equippedWeapon);
-  if (!w) return 1 + armorAtk;
-  return 1 + (w.attack || 0) + (w.level || 0) + armorAtk;
+  if (!w) return 1 + armorAtk + classAtk;
+  return 1 + (w.attack || 0) + (w.level || 0) + armorAtk + classAtk;
 }
+function getClassHpBonus() { return getClassStatBonus("hp"); }
+function getClassDefBonus() { return getClassStatBonus("def"); }
 
 function getEquippedWeaponItem() {
   if (!progress.char || !progress.char.equippedWeapon) return null;
@@ -1336,7 +1417,7 @@ function triggerMonsterAttack(overrideDamage) {
       showBattleEffect(`🌸護盾${rem}`, "#fd79a8");
       monsterDmg = 0;
     }
-    monsterDmg = Math.max(0, monsterDmg - getArmorDefense());
+    monsterDmg = Math.max(0, monsterDmg - getArmorDefense() - getClassDefBonus());
     battleState.playerHp = Math.max(0, battleState.playerHp - monsterDmg);
     updatePlayerHP();
     shakeArena(false);
@@ -1376,6 +1457,8 @@ function ensureChar() {
   if (progress.char.coins === undefined) progress.char.coins = 0;
   if (progress.char.armorInventory === undefined) progress.char.armorInventory = [];
   if (progress.char.equippedArmor === undefined) progress.char.equippedArmor = null;
+  if (progress.char.classes === undefined) progress.char.classes = {};
+  if (progress.char.equippedClass === undefined) progress.char.equippedClass = null;
 }
 
 function addCoins(amount) {
@@ -1953,6 +2036,58 @@ function renderCharPanel() {
     `HP 成長：每 12 級 +1（Lv.504 ≈ 44HP 可扛龍火，Lv.999 最高 86HP）<br>` +
     `下次 HP 提升：Lv.${nextHpLevel}（目前 ${c.maxHp} HP）<br>` +
     `一般模式怪物：${days} 天，上限 50HP｜熟記模式怪物：${learnedHp}HP（${learnedCount} 字）`;
+  renderClassPanel();
+}
+
+function renderClassPanel() {
+  const panel = document.getElementById("class-panel-content");
+  if (!panel) return;
+  const learnedCount = (progress.learnedIds || []).length;
+  if (learnedCount < 50) {
+    panel.innerHTML = `<div class="class-locked"><span class="class-lock-icon">🔒</span><span class="class-lock-text">熟記 50 字後開放（目前 ${learnedCount} 字）</span></div>`;
+    return;
+  }
+  const equippedKey = getEquippedClassKey();
+  let html = "";
+  if (equippedKey) {
+    const cls = getClassDef(equippedKey);
+    const lv = getClassLevel(equippedKey);
+    const nextWords = lv < 5 ? (progress.char.classes[equippedKey].unlockWordCount + lv * 150) : null;
+    const remaining = nextWords ? nextWords - learnedCount : 0;
+    html += `<div class="class-equipped-row">
+      <span class="class-badge">${cls.emoji} ${cls.name} Lv.${lv}</span>
+      <span class="class-skill-desc">${cls.skillDesc(lv)}</span>
+      ${lv < 5 ? `<span class="class-next-lv">下等：再熟記 ${Math.max(0, remaining)} 字</span>` : `<span class="class-next-lv" style="color:#ffd700">★ 滿等</span>`}
+    </div>`;
+  }
+  html += `<div class="class-list">`;
+  CLASSES.forEach(cls => {
+    const data = progress.char.classes?.[cls.key];
+    const unlocked = data?.unlocked;
+    const lv = unlocked ? getClassLevel(cls.key) : 0;
+    const isEquipped = cls.key === equippedKey;
+    if (unlocked) {
+      html += `<button class="class-item${isEquipped ? " equipped" : ""}" data-class="${cls.key}">
+        <span class="class-item-name">${cls.emoji} ${cls.name}</span>
+        <span class="class-item-lv">Lv.${lv}</span>
+      </button>`;
+    } else {
+      const wt = WEAPON_TYPES.find(w => w.key === cls.weapon);
+      html += `<div class="class-item locked" title="需要取得 ${wt?.emoji || ""}${wt?.name || cls.weapon}">
+        <span class="class-item-name">🔒 ${cls.name}</span>
+        <span class="class-item-lv" style="font-size:0.75rem;color:var(--text-light)">需 ${wt?.emoji || ""}${wt?.name || ""}</span>
+      </div>`;
+    }
+  });
+  html += `</div>`;
+  panel.innerHTML = html;
+  panel.querySelectorAll(".class-item[data-class]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      progress.char.equippedClass = btn.dataset.class;
+      saveProgress(progress);
+      renderClassPanel();
+    });
+  });
 }
 
 // === 事件綁定 ===
