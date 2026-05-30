@@ -264,15 +264,16 @@ body {
   margin-bottom: 8px;
   color: var(--primary);
 }
-.quiz-options { display: grid; gap: 6px; margin-bottom: 8px; }
+.quiz-options { display: grid; gap: 12px; margin-bottom: 8px; }
 .quiz-options button {
-  padding: 9px 12px;
+  padding: 18px 16px;
   background: white;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 0.95rem;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: 1.05rem;
   text-align: left;
   cursor: pointer;
+  min-height: 56px;
 }
 .quiz-options button.correct { background: var(--correct); color: white; border-color: var(--correct); }
 .quiz-options button.wrong { background: var(--wrong); color: white; border-color: var(--wrong); }
