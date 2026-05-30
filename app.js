@@ -334,14 +334,27 @@ function giveArmorStreakReward() {
   ensureChar();
   if (!progress.char.armorInventory) progress.char.armorInventory = [];
   const armor = ARMORS[Math.floor(Math.random() * ARMORS.length)];
-  progress.char.armorInventory.push({ type: armor.key });
-  if (!progress.char.equippedArmor) progress.char.equippedArmor = armor.key;
+  const existing = progress.char.armorInventory.find(a => a.type === armor.key);
+  let modalText;
+  if (existing) {
+    existing.level = (existing.level || 1) + 1;
+    const lvDesc = getArmorLevelDesc(armor.key, existing.level);
+    modalText =
+      `🎉 連續學習 ${progress.streak} 天！<br>` +
+      `${armor.emoji} <strong>${armor.name}</strong> 升級！<br>` +
+      `<span style="color:#ffd700;font-size:1rem">★ Lv.${existing.level}</span><br>` +
+      `<span style="font-size:0.85rem;color:var(--text-light)">${lvDesc}</span>`;
+  } else {
+    progress.char.armorInventory.push({ type: armor.key, level: 1 });
+    if (!progress.char.equippedArmor) progress.char.equippedArmor = armor.key;
+    modalText =
+      `🎉 連續學習 ${progress.streak} 天！<br>` +
+      `獲得防具：${armor.emoji} <strong>${armor.name}</strong><br>` +
+      `<span style="color:#ffd700;font-size:1rem">★ Lv.1</span><br>` +
+      `<span style="font-size:0.85rem;color:var(--text-light)">${getArmorLevelDesc(armor.key, 1)}</span>`;
+  }
   saveProgress(progress);
-  showChestModal(armor.emoji,
-    `🎉 連續學習 ${progress.streak} 天！<br>` +
-    `獲得防具：${armor.emoji} <strong>${armor.name}</strong><br>` +
-    `<span style="font-size:0.85rem;color:var(--text-light)">${armor.desc}</span>`
-  );
+  showChestModal(armor.emoji, modalText);
 }
 
 // === 測驗 ===
@@ -809,18 +822,35 @@ function getPlayerMaxHp() {
 function getEquippedArmorType() {
   return (progress.char && progress.char.equippedArmor) || null;
 }
+function getEquippedArmorItem() {
+  const type = getEquippedArmorType();
+  if (!type) return null;
+  return (progress.char.armorInventory || []).find(a => a.type === type) || null;
+}
 function getArmorData(key) {
   return ARMORS.find(a => a.key === key) || null;
 }
+function getArmorLevel() {
+  const item = getEquippedArmorItem();
+  return item ? (item.level || 1) : 0;
+}
+function getArmorLevelDesc(key, level) {
+  switch (key) {
+    case "paradise_cape": return `每場抵禦 ${level} 次怪物攻擊`;
+    case "dragon_coat":   return `攻擊力+${level}、每次傷害減少 ${level}`;
+    case "magic_cloak":   return `武器攻擊+${level}、觸發機率+${level * 5}%`;
+    default: return "";
+  }
+}
 function getArmorAttackBonus() {
   const a = getEquippedArmorType();
-  return (a === "dragon_coat" || a === "magic_cloak") ? 1 : 0;
+  return (a === "dragon_coat" || a === "magic_cloak") ? getArmorLevel() : 0;
 }
 function getArmorDefense() {
-  return getEquippedArmorType() === "dragon_coat" ? 1 : 0;
+  return getEquippedArmorType() === "dragon_coat" ? getArmorLevel() : 0;
 }
 function getMagicCloakProbBonus() {
-  return getEquippedArmorType() === "magic_cloak" ? 0.05 : 0;
+  return getEquippedArmorType() === "magic_cloak" ? getArmorLevel() * 0.05 : 0;
 }
 function getPlayerAttack() {
   const armorAtk = getArmorAttackBonus();
@@ -864,7 +894,7 @@ let timerInterval = null;
 
 function initBattle() {
   const mHp = getMonsterMaxHp();
-  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: getEquippedArmorType() === "paradise_cape" ? 1 : 0 };
+  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: getEquippedArmorType() === "paradise_cape" ? getArmorLevel() : 0 };
   const mChar = document.getElementById("monster-char");
   if (mChar) { mChar.textContent = state.quiz?.range === "all" ? "🐉" : MONSTERS[0]; mChar.className = "battle-char"; }
   const pChar = document.getElementById("player-char");
@@ -1301,8 +1331,9 @@ function triggerMonsterAttack(overrideDamage) {
       updateShieldDisplay();
     }
     if (battleState.armorShield > 0) {
-      battleState.armorShield = 0;
-      showBattleEffect("🌸 護盾！", "#fd79a8");
+      battleState.armorShield--;
+      const rem = battleState.armorShield > 0 ? `(剩${battleState.armorShield})` : "";
+      showBattleEffect(`🌸護盾${rem}`, "#fd79a8");
       monsterDmg = 0;
     }
     monsterDmg = Math.max(0, monsterDmg - getArmorDefense());
@@ -1895,8 +1926,14 @@ function renderCharPanel() {
   } else {
     set("char-weapon", "無");
   }
+  const equippedArmorItem = getEquippedArmorItem();
   const equippedArmorData = getArmorData(getEquippedArmorType());
-  set("char-armor", equippedArmorData ? `${equippedArmorData.emoji} ${equippedArmorData.name}` : "無");
+  if (equippedArmorData && equippedArmorItem) {
+    const aLv = equippedArmorItem.level || 1;
+    set("char-armor", `${equippedArmorData.emoji} ${equippedArmorData.name} Lv.${aLv}`);
+  } else {
+    set("char-armor", "無");
+  }
   set("inv-potions", c.potions);
   set("inv-chests", c.chests);
   set("inv-rainbow", c.rainbowTickets || 0);
