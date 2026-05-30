@@ -461,16 +461,18 @@ function answerQuestion(btn, isCorrect, q) {
     state.quiz.correct++;
     progress.quizCorrect++;
     battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
-    // 答對 +1 金幣，每日上限 20 枚（按測驗模式分開計算）
-    ensureDailyTasks();
-    const coinKey = state.quiz.mode === "en-to-zh" ? "dailyCoinEnToZh" : "dailyCoinZhToEn";
-    const todayCoins = progress.dailyTasks[coinKey] || 0;
-    if (todayCoins < 20) {
-      addCoins(1);
-      progress.dailyTasks[coinKey] = todayCoins + 1;
-      saveProgress(progress);
-      state.quiz.coinsEarned = (state.quiz.coinsEarned || 0) + 1;
-      showBattleEffect("💰+1", "#f4a261");
+    // 答對 +1 金幣（僅熟記模式），每日上限 20 枚（按測驗模式分開計算）
+    if (state.quiz.range === "learned") {
+      ensureDailyTasks();
+      const coinKey = state.quiz.mode === "en-to-zh" ? "dailyCoinEnToZh" : "dailyCoinZhToEn";
+      const todayCoins = progress.dailyTasks[coinKey] || 0;
+      if (todayCoins < 20) {
+        addCoins(1);
+        progress.dailyTasks[coinKey] = todayCoins + 1;
+        saveProgress(progress);
+        state.quiz.coinsEarned = (state.quiz.coinsEarned || 0) + 1;
+        showBattleEffect("💰+1", "#f4a261");
+      }
     }
     if (isCritical) {
       // 龍魂聖劍：每 5 次爆擊治癒（隨等級增加回復量）
@@ -619,7 +621,7 @@ function finishQuiz() {
     : atCap ? `<br><span style="color:var(--text-light);font-size:0.9rem">💰 今日此測驗金幣已達上限 20 枚</span>` : "";
   // 全對獎勵（英譯中／中譯英各每日一次）
   let perfectLine = "";
-  if (state.quiz.correct === total && (state.quiz.mode === "en-to-zh" || state.quiz.mode === "zh-to-en")) {
+  if (state.quiz.range === "learned" && state.quiz.correct === total) {
     ensureDailyTasks();
     const perfKey = state.quiz.mode === "en-to-zh" ? "perfectCoinEnToZh" : "perfectCoinZhToEn";
     if (!progress.dailyTasks[perfKey]) {
