@@ -873,6 +873,19 @@ body {
 }
 .chest-btn { background: var(--accent); }
 .inv-btn:active { opacity: 0.75; }
+.char-class-card {
+  background: white; border-radius: 12px;
+  padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow);
+}
+.char-class-card h3 {
+  font-size: 0.9rem; margin-bottom: 10px; color: var(--text-light);
+}
+.class-locked {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 0; gap: 6px; opacity: 0.45;
+}
+.class-lock-icon { font-size: 1.6rem; }
+.class-lock-text { font-size: 0.88rem; color: var(--text-light); letter-spacing: 0.04em; }
 .task-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;

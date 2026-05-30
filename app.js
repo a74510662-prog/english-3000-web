@@ -1848,6 +1848,7 @@ function renderCharPanel() {
   } else {
     set("char-weapon", "無");
   }
+  set("char-armor", "無");
   set("inv-potions", c.potions);
   set("inv-chests", c.chests);
   set("inv-rainbow", c.rainbowTickets || 0);
