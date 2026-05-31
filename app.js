@@ -883,6 +883,16 @@ function getClassStatBonus(stat) {
   const base = cls.stats[stat] || 0;
   return base > 0 ? base + (lv - 1) : base;
 }
+function calcClassStat(clsDef, lv, stat) {
+  if (!clsDef || lv <= 0) return 0;
+  const base = clsDef.stats[stat] || 0;
+  return base > 0 ? base + (lv - 1) : base;
+}
+function renderStatSpan(val) {
+  if (val > 0) return `<span class="stat-pos">+${val}</span>`;
+  if (val < 0) return `<span class="stat-neg">${val}</span>`;
+  return `<span class="stat-zero">--</span>`;
+}
 function checkClassUnlocks() {
   const learned = (progress.learnedIds || []).length;
   if (learned < 50) return;
@@ -2044,6 +2054,42 @@ function renderCharPanel() {
   renderClassPanel();
 }
 
+let pendingClassKey = null;
+function showClassSwitchModal(newKey) {
+  const oldKey = getEquippedClassKey();
+  const oldCls = oldKey ? getClassDef(oldKey) : null;
+  const newCls = getClassDef(newKey);
+  if (!newCls) return;
+  pendingClassKey = newKey;
+
+  const oldLv  = oldKey ? getClassLevel(oldKey) : 0;
+  const newLv  = getClassLevel(newKey);
+  const oldHp  = calcClassStat(oldCls, oldLv, 'hp');
+  const oldAtk = calcClassStat(oldCls, oldLv, 'atk');
+  const oldDef = calcClassStat(oldCls, oldLv, 'def');
+  const newHp  = calcClassStat(newCls, newLv, 'hp');
+  const newAtk = calcClassStat(newCls, newLv, 'atk');
+  const newDef = calcClassStat(newCls, newLv, 'def');
+
+  function sv(v) { return v > 0 ? `+${v}` : v === 0 ? '--' : `${v}`; }
+  function dv(v) {
+    if (v > 0) return `<span style="color:#27ae60">+${v}▲</span>`;
+    if (v < 0) return `<span style="color:#e74c3c">${v}▼</span>`;
+    return `<span style="color:var(--text-light)">±0</span>`;
+  }
+  const oldLabel = oldCls ? `${oldCls.emoji}${oldCls.name} Lv.${oldLv}` : '（無）';
+  const newLabel = `${newCls.emoji}${newCls.name} Lv.${newLv}`;
+  document.getElementById("class-switch-header").innerHTML =
+    `${oldLabel} <span style="color:var(--text-light)">→</span> ${newLabel}`;
+  document.getElementById("class-switch-table").innerHTML = `
+    <tr><th></th><th>❤️ HP</th><th>⚔️ 攻擊</th><th>🛡️ 防禦</th></tr>
+    ${oldCls ? `<tr><td>${oldCls.emoji}${oldCls.name}</td><td>${sv(oldHp)}</td><td>${sv(oldAtk)}</td><td>${sv(oldDef)}</td></tr>` : ''}
+    <tr><td>${newCls.emoji}${newCls.name}</td><td>${sv(newHp)}</td><td>${sv(newAtk)}</td><td>${sv(newDef)}</td></tr>
+    <tr class="switch-diff-row"><td>變化</td><td>${dv(newHp-oldHp)}</td><td>${dv(newAtk-oldAtk)}</td><td>${dv(newDef-oldDef)}</td></tr>
+  `;
+  document.getElementById("class-switch-modal").classList.remove("hidden");
+}
+
 function renderClassPanel() {
   const panel = document.getElementById("class-panel-content");
   if (!panel) return;
@@ -2074,15 +2120,23 @@ function renderClassPanel() {
     const lv = unlocked ? getClassLevel(cls.key) : 0;
     const isEquipped = cls.key === equippedKey;
     if (unlocked) {
+      const hp  = calcClassStat(cls, lv, 'hp');
+      const atk = calcClassStat(cls, lv, 'atk');
+      const def = calcClassStat(cls, lv, 'def');
       html += `<button class="class-item${isEquipped ? " equipped" : ""}" data-class="${cls.key}">
         <span class="class-item-name">${cls.emoji} ${cls.name}</span>
         <span class="class-item-lv">Lv.${lv}</span>
+        <span class="class-item-stats">❤️${renderStatSpan(hp)} ⚔️${renderStatSpan(atk)} 🛡️${renderStatSpan(def)}</span>
       </button>`;
     } else {
       const wt = WEAPON_TYPES.find(w => w.key === cls.weapon);
+      const bHp  = cls.stats.hp  || 0;
+      const bAtk = cls.stats.atk || 0;
+      const bDef = cls.stats.def || 0;
       html += `<div class="class-item locked" title="需要取得 ${wt?.emoji || ""}${wt?.name || cls.weapon}">
         <span class="class-item-name">🔒 ${cls.name}</span>
         <span class="class-item-lv" style="font-size:0.75rem;color:var(--text-light)">需 ${wt?.emoji || ""}${wt?.name || ""}</span>
+        <span class="class-item-stats" style="opacity:0.5">❤️${renderStatSpan(bHp)} ⚔️${renderStatSpan(bAtk)} 🛡️${renderStatSpan(bDef)}</span>
       </div>`;
     }
   });
@@ -2090,15 +2144,24 @@ function renderClassPanel() {
   panel.innerHTML = html;
   panel.querySelectorAll(".class-item[data-class]").forEach(btn => {
     btn.addEventListener("click", () => {
-      progress.char.equippedClass = btn.dataset.class;
-      saveProgress(progress);
-      renderClassPanel();
+      const newKey = btn.dataset.class;
+      if (newKey === equippedKey) return;
+      showClassSwitchModal(newKey);
     });
   });
 }
 
 // === 事件綁定 ===
 document.addEventListener("DOMContentLoaded", () => {
+  // 進場動畫：顯示 1.8 秒後淡出移除
+  const introEl = document.getElementById("intro-overlay");
+  if (introEl) {
+    setTimeout(() => {
+      introEl.classList.add("fade-out");
+      setTimeout(() => introEl.remove(), 500);
+    }, 1800);
+  }
+
   // 使用者初始化
   const savedUser = localStorage.getItem(CURRENT_USER_KEY);
   if (savedUser && getUsers().includes(savedUser)) {
@@ -2169,6 +2232,19 @@ document.getElementById("back-to-today").addEventListener("click", () => {
   document.getElementById("quiz-use-potion-btn").addEventListener("click", usePotion);
   document.getElementById("chest-close-btn").addEventListener("click", () => {
     document.getElementById("chest-modal").classList.add("hidden");
+  });
+  document.getElementById("class-switch-confirm-btn").addEventListener("click", () => {
+    document.getElementById("class-switch-modal").classList.add("hidden");
+    if (pendingClassKey) {
+      progress.char.equippedClass = pendingClassKey;
+      saveProgress(progress);
+      pendingClassKey = null;
+      renderCharPanel();
+    }
+  });
+  document.getElementById("class-switch-cancel-btn").addEventListener("click", () => {
+    document.getElementById("class-switch-modal").classList.add("hidden");
+    pendingClassKey = null;
   });
 
   // 商店按鈕

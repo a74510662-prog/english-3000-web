@@ -904,6 +904,38 @@ body {
 .class-item.locked { opacity: 0.4; cursor: default; }
 .class-item-name { font-size: 0.85rem; font-weight: bold; }
 .class-item-lv { font-size: 0.75rem; color: var(--primary); }
+.class-item-stats { font-size: 0.68rem; display: flex; gap: 4px; justify-content: center; flex-wrap: nowrap; }
+.stat-pos { color: #27ae60; }
+.stat-neg { color: #e74c3c; }
+.stat-zero { color: var(--text-light); }
+
+/* 職業切換 Modal */
+.class-switch-box {
+  background: white; border-radius: 20px; padding: 22px 18px;
+  width: 100%; max-width: 340px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+.class-switch-title { font-size: 1rem; font-weight: bold; text-align: center; margin-bottom: 10px; }
+.class-switch-header {
+  text-align: center; font-size: 0.88rem; font-weight: bold;
+  margin-bottom: 12px; color: var(--primary);
+}
+.class-switch-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 16px; }
+.class-switch-table th { padding: 4px 6px; color: var(--text-light); font-weight: normal; text-align: center; }
+.class-switch-table td { padding: 6px 6px; border-top: 1px solid var(--border); text-align: center; }
+.class-switch-table td:first-child { text-align: left; font-size: 0.82rem; }
+.switch-diff-row td { color: var(--text-light); font-size: 0.8rem; }
+.class-switch-btns { display: flex; gap: 10px; }
+.class-switch-cancel {
+  flex: 1; padding: 10px; border: 1.5px solid var(--border);
+  background: white; border-radius: 8px; cursor: pointer; font-size: 0.95rem;
+}
+.class-switch-confirm {
+  flex: 1; padding: 10px; background: var(--primary); color: white;
+  border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem;
+}
+.class-switch-confirm:active { background: var(--primary-light); }
+
 .task-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;
@@ -1172,3 +1204,44 @@ body {
     padding-bottom: 24px;
   }
 }
+
+/* 進場動畫 */
+@keyframes intro-animal-bounce {
+  0%   { transform: scale(0.5) translateY(30px); opacity: 0; }
+  60%  { transform: scale(1.15) translateY(-8px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes intro-title-in {
+  0%   { opacity: 0; letter-spacing: 0.3em; }
+  100% { opacity: 1; letter-spacing: 0.12em; }
+}
+@keyframes intro-sub-in {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes intro-fade-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; pointer-events: none; }
+}
+.intro-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+}
+.intro-overlay.fade-out { animation: intro-fade-out 0.5s ease forwards; }
+.intro-box { text-align: center; }
+.intro-animal {
+  font-size: 4.5rem; line-height: 1;
+  animation: intro-animal-bounce 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;
+}
+.intro-title {
+  font-size: 1.5rem; font-weight: bold; color: white;
+  letter-spacing: 0.12em; margin-top: 14px;
+  animation: intro-title-in 0.6s ease 0.6s both;
+}
+.intro-sub {
+  font-size: 1rem; color: rgba(255,255,255,0.75); margin-top: 6px;
+  letter-spacing: 0.15em;
+  animation: intro-sub-in 0.5s ease 0.9s both;
+}
+.intro-eq { color: var(--accent); font-weight: bold; }

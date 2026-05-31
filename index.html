@@ -4,13 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#2c5f87" />
-  <title>Oxford 3000 每日單字</title>
+  <title>ENGLISH ANIMAL E2方程式</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- 進場動畫 -->
+  <div id="intro-overlay" class="intro-overlay">
+    <div class="intro-box">
+      <div class="intro-animal">🐾</div>
+      <div class="intro-title">ENGLISH ANIMAL</div>
+      <div class="intro-sub">E2 <span class="intro-eq">方程式</span></div>
+    </div>
+  </div>
+
   <header class="app-header">
     <div class="header-top">
       <h1 id="page-title">每日單字</h1>
@@ -281,6 +290,18 @@
       <div id="chest-anim" class="chest-anim">📦</div>
       <div id="chest-reward-text" class="chest-reward-text"></div>
       <button id="chest-close-btn" class="chest-close-btn">收下</button>
+    </div>
+  </div>
+
+  <div id="class-switch-modal" class="chest-modal hidden">
+    <div class="class-switch-box">
+      <div class="class-switch-title">切換職業？</div>
+      <div id="class-switch-header" class="class-switch-header"></div>
+      <table id="class-switch-table" class="class-switch-table"></table>
+      <div class="class-switch-btns">
+        <button id="class-switch-cancel-btn" class="class-switch-cancel">取消</button>
+        <button id="class-switch-confirm-btn" class="class-switch-confirm">確認切換</button>
+      </div>
     </div>
   </div>
 
