@@ -439,7 +439,7 @@ function renderQuestion() {
   // 術士：連答對 3 題後，下一題消除 lv 個錯誤選項
   if (getEquippedClassKey() === "sorcerer" && battleState.sorcererBuff) {
     battleState.sorcererBuff = false;
-    const lv = getEquippedClassLevel();
+    const lv = Math.max(1, getEquippedClassLevel());
     const removeCount = Math.min(lv, wrongs.length);
     if (removeCount > 0) {
       wrongs = wrongs.slice(0, wrongs.length - removeCount);
