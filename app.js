@@ -436,13 +436,14 @@ function renderQuestion() {
   const q = state.quiz.questions[state.quiz.idx];
   const distractorPool = state.quiz.pool.length >= 4 ? state.quiz.pool : wordsPool;
   let wrongs = shuffle(distractorPool.filter(w => w.word !== q.word)).slice(0, 3);
-  // 術士：每題消除 lv 個錯誤選項
-  if (getEquippedClassKey() === "sorcerer") {
+  // 術士：連答對 3 題後，下一題消除 lv 個錯誤選項
+  if (getEquippedClassKey() === "sorcerer" && battleState.sorcererBuff) {
+    battleState.sorcererBuff = false;
     const lv = getEquippedClassLevel();
     const removeCount = Math.min(lv, wrongs.length);
     if (removeCount > 0) {
       wrongs = wrongs.slice(0, wrongs.length - removeCount);
-      showBattleEffect(`🪄消除${removeCount}個錯誤選項`, "#a29bfe");
+      showBattleEffect(`🪄魔法消除${removeCount}個選項`, "#a29bfe");
     }
   }
   const options = shuffle([q, ...wrongs]);
@@ -501,6 +502,11 @@ function answerQuestion(btn, isCorrect, q) {
     state.quiz.correct++;
     progress.quizCorrect++;
     battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
+    // 術士：每連答對 3 題，下一題觸發魔法消除
+    if (getEquippedClassKey() === "sorcerer" && battleState.consecutiveCorrect % 3 === 0) {
+      battleState.sorcererBuff = true;
+      showBattleEffect("🪄蓄積中…", "#a29bfe");
+    }
     // 答對 +1 金幣（僅熟記模式），每日上限 20 枚（按測驗模式分開計算）
     if (state.quiz.range === "learned") {
       ensureDailyTasks();
@@ -546,6 +552,7 @@ function answerQuestion(btn, isCorrect, q) {
     triggerAttack(isCritical);
   } else {
     battleState.consecutiveCorrect = 0;
+    battleState.sorcererBuff = false;
     progress.quizWrong++;
     fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
     fb.className = "quiz-feedback no";
@@ -779,7 +786,7 @@ const CLASSES = [
     skillDesc: lv => `答對穿透 +${lv} 固定傷害` },
   { key: "sorcerer", name: "術士", emoji: "🪄", weapon: "staff",
     stats: { hp: 1, atk: 0, def: 1 },
-    skillDesc: lv => `每題消除 ${lv} 個錯誤選項` },
+    skillDesc: lv => `連答對 3 題，下題消除 ${lv} 個錯誤選項` },
   { key: "hunter", name: "獵人", emoji: "🪃", weapon: "boomerang",
     stats: { hp: 0, atk: 2, def: -1 },
     skillDesc: lv => `連答 ${lv <= 2 ? 3 : 2} 題，傷害 ×${lv + 1}` },
@@ -878,7 +885,7 @@ function getClassLevel(key) {
   const data = progress.char?.classes?.[key];
   if (!data?.unlocked) return 0;
   const learned = Math.min((progress.learnedIds || []).length, 3000);
-  return Math.min(5, Math.floor((learned - data.unlockWordCount) / 150) + 1);
+  return Math.min(5, Math.max(1, Math.floor((learned - (data.unlockWordCount || 0)) / 150) + 1));
 }
 function getEquippedClassLevel() {
   const key = getEquippedClassKey();
@@ -989,13 +996,13 @@ function getWeaponSpecialDesc(wt, item) {
   }
 }
 
-let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: 0 };
+let battleState = { hp: 10, monsterMaxHp: 10, monsterIdx: 0, playerHp: 3, sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: 0, sorcererBuff: false };
 let questionStartTime = null;
 let timerInterval = null;
 
 function initBattle() {
   const mHp = getMonsterMaxHp();
-  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: getEquippedArmorType() === "paradise_cape" ? getArmorLevel() : 0 };
+  battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: getEquippedArmorType() === "paradise_cape" ? getArmorLevel() : 0, sorcererBuff: false };
   const mChar = document.getElementById("monster-char");
   if (mChar) { mChar.textContent = state.quiz?.range === "all" ? "🐉" : MONSTERS[0]; mChar.className = "battle-char"; }
   const pChar = document.getElementById("player-char");
