@@ -1418,8 +1418,8 @@ function triggerMonsterAttack(overrideDamage) {
       showBattleEffect(`🌸護盾${rem}`, "#fd79a8");
       monsterDmg = 0;
     }
-    if (state.quiz?.range !== "all") {
-      monsterDmg = Math.max(0, monsterDmg - getArmorDefense() - getClassDefBonus());
+    if (state.quiz?.range !== "all" && monsterDmg > 0) {
+      monsterDmg = Math.max(1, monsterDmg - getArmorDefense() - getClassDefBonus());
     }
     battleState.playerHp = Math.max(0, battleState.playerHp - monsterDmg);
     updatePlayerHP();
