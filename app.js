@@ -1525,6 +1525,7 @@ function giveLevelUpWeapons() {
   }
   progress.char.weaponInventory = inv;
   saveProgress(progress);
+  checkClassUnlocks();
   showChestModal("🆙", `升級獎勵！獲得 ${wt.emoji}${wt.name} 碎片 ×2${upgradeText}`);
 }
 
@@ -1792,6 +1793,7 @@ function openChest() {
     emoji = "💨";
     text = "空箱子……什麼都沒有";
   }
+  checkClassUnlocks();
   showChestModal(emoji, text);
   renderCharPanel();
 }
@@ -2052,14 +2054,16 @@ function renderClassPanel() {
   }
   const equippedKey = getEquippedClassKey();
   let html = "";
-  if (equippedKey) {
-    const cls = getClassDef(equippedKey);
+  const equippedCls = equippedKey ? getClassDef(equippedKey) : null;
+  const equippedClassData = equippedKey ? progress.char.classes?.[equippedKey] : null;
+  if (equippedCls && equippedClassData?.unlocked) {
     const lv = getClassLevel(equippedKey);
-    const nextWords = lv < 5 ? (progress.char.classes[equippedKey].unlockWordCount + lv * 150) : null;
-    const remaining = nextWords ? nextWords - learnedCount : 0;
+    const unlockWordCount = equippedClassData.unlockWordCount || 0;
+    const nextWords = lv < 5 ? (unlockWordCount + lv * 150) : null;
+    const remaining = nextWords != null ? nextWords - learnedCount : 0;
     html += `<div class="class-equipped-row">
-      <span class="class-badge">${cls.emoji} ${cls.name} Lv.${lv}</span>
-      <span class="class-skill-desc">${cls.skillDesc(lv)}</span>
+      <span class="class-badge">${equippedCls.emoji} ${equippedCls.name} Lv.${lv}</span>
+      <span class="class-skill-desc">${equippedCls.skillDesc(lv)}</span>
       ${lv < 5 ? `<span class="class-next-lv">下等：再熟記 ${Math.max(0, remaining)} 字</span>` : `<span class="class-next-lv" style="color:#ffd700">★ 滿等</span>`}
     </div>`;
   }
