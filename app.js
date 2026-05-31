@@ -435,7 +435,16 @@ function renderQuestion() {
   }
   const q = state.quiz.questions[state.quiz.idx];
   const distractorPool = state.quiz.pool.length >= 4 ? state.quiz.pool : wordsPool;
-  const wrongs = shuffle(distractorPool.filter(w => w.word !== q.word)).slice(0, 3);
+  let wrongs = shuffle(distractorPool.filter(w => w.word !== q.word)).slice(0, 3);
+  // 術士：每題消除 lv 個錯誤選項
+  if (getEquippedClassKey() === "sorcerer") {
+    const lv = getEquippedClassLevel();
+    const removeCount = Math.min(lv, wrongs.length);
+    if (removeCount > 0) {
+      wrongs = wrongs.slice(0, wrongs.length - removeCount);
+      showBattleEffect(`🪄消除${removeCount}個錯誤選項`, "#a29bfe");
+    }
+  }
   const options = shuffle([q, ...wrongs]);
 
   document.getElementById("q-current").textContent = state.quiz.idx + 1;
