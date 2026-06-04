@@ -123,6 +123,7 @@ function loadProgress() {
     if (p.char.welcomeRewardClaimed === undefined) p.char.welcomeRewardClaimed = false;
     if (p.learnedModeClears === undefined) p.learnedModeClears = 0;
     if (!p.weakWordIds) p.weakWordIds = [];
+    if (!p.weakWordCounts) p.weakWordCounts = {};
     if (!p.wishes) p.wishes = ["", "", "", "", ""];
     if (!p.wishesClaimed) p.wishesClaimed = [false, false, false, false, false];
     // 重新計算 HP（新級距：每 12 級 +1，舊為每 5 級 +1）
@@ -149,7 +150,8 @@ function newProgress() {
     dailyTasks: { date: "", enToZhDone: false, zhToEnDone: false },
     lastLoginDate: "",
     learnedModeClears: 0,
-    weakWordIds: []
+    weakWordIds: [],
+    weakWordCounts: {}
   };
 }
 function saveProgress(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
@@ -583,9 +585,14 @@ function answerQuestion(btn, isCorrect, q) {
     state.quiz.correct++;
     progress.quizCorrect++;
     battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
-    // 熟記模式答對 → 從弱點清單移除
-    if (state.quiz.range === "learned" && progress.weakWordIds) {
-      progress.weakWordIds = progress.weakWordIds.filter(id => id !== q.id);
+    // 熟記模式答對 → 累計計數，連續答對 3 次才從弱點清單移除
+    if (state.quiz.range === "learned" && progress.weakWordIds && progress.weakWordIds.includes(q.id)) {
+      if (!progress.weakWordCounts) progress.weakWordCounts = {};
+      progress.weakWordCounts[q.id] = (progress.weakWordCounts[q.id] || 0) + 1;
+      if (progress.weakWordCounts[q.id] >= 3) {
+        progress.weakWordIds = progress.weakWordIds.filter(id => id !== q.id);
+        delete progress.weakWordCounts[q.id];
+      }
     }
     // 術士：每連答對 3 題，下一題觸發魔法消除
     if (getEquippedClassKey() === "sorcerer" && battleState.consecutiveCorrect % 3 === 0) {
@@ -638,10 +645,12 @@ function answerQuestion(btn, isCorrect, q) {
     battleState.consecutiveCorrect = 0;
     battleState.sorcererBuff = false;
     progress.quizWrong++;
-    // 熟記模式答錯 → 加入弱點清單
+    // 熟記模式答錯 → 加入弱點清單，答對計數歸零
     if (state.quiz.range === "learned") {
       if (!progress.weakWordIds) progress.weakWordIds = [];
+      if (!progress.weakWordCounts) progress.weakWordCounts = {};
       if (!progress.weakWordIds.includes(q.id)) progress.weakWordIds.push(q.id);
+      progress.weakWordCounts[q.id] = 0;
     }
     fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
     fb.className = "quiz-feedback no";
