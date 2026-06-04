@@ -2229,56 +2229,59 @@ function renderWeaponInventory() {
 }
 
 function renderArmorInventory() {
+  ensureChar();
   const container = document.getElementById("armor-inventory");
   if (!container) return;
-  const inv = (progress.char && progress.char.armorInventory) ? progress.char.armorInventory : [];
-  const equipped = (progress.char && progress.char.equippedArmor) || null;
+
+  const inv = progress.char.armorInventory || [];
+  const equippedType = progress.char.equippedArmor || null;
 
   const equippedDisplay = document.getElementById("armor-equipped-display");
   if (equippedDisplay) {
-    const eq = inv.find(x => x.type === equipped);
-    if (eq) {
-      const ad = getArmorData(eq.type);
-      equippedDisplay.textContent = `${ad.emoji} ${ad.name} Lv.${eq.level || 1}`;
-    } else {
-      equippedDisplay.textContent = "無";
-    }
+    const equippedItem = inv.find(x => x.type === equippedType);
+    const ad = equippedItem ? getArmorData(equippedItem.type) : null;
+    equippedDisplay.textContent = (ad && equippedItem)
+      ? `${ad.emoji} ${ad.name} Lv.${equippedItem.level || 1}`
+      : "無";
   }
 
   if (inv.length === 0) {
     container.innerHTML = '<div class="weapon-empty">尚無防具，累積連續學習或達到里程碑獲得</div>';
     return;
   }
+
   container.innerHTML = "";
-  inv.forEach(a => {
+  for (let i = 0; i < inv.length; i++) {
+    const a = inv[i];
     const ad = getArmorData(a.type);
-    if (!ad) return;
-    const isEquipped = a.type === equipped;
+    if (!ad) continue;
+    const isEquipped = (a.type === equippedType);
     const lv = a.level || 1;
     const div = document.createElement("div");
     div.className = "weapon-item" + (isEquipped ? " equipped" : "");
     div.innerHTML =
-      '<div class="weapon-item-icon">' + ad.emoji + '</div>' +
-      '<div class="weapon-item-info">' +
-        '<div class="weapon-item-name">' + ad.name + ' <span class="weapon-lv-tag">Lv.' + lv + '</span></div>' +
-        '<div class="weapon-item-sub">' + getArmorLevelDesc(a.type, lv) + '</div>' +
-        '<div class="weapon-item-special">' + ad.desc + '</div>' +
-      '</div>' +
-      '<div class="weapon-item-action">' +
-        (isEquipped
-          ? '<span class="weapon-badge">裝備中</span>'
-          : '<button class="armor-equip-btn">裝備</button>') +
-      '</div>';
+      `<div class="weapon-item-icon">${ad.emoji}</div>` +
+      `<div class="weapon-item-info">` +
+        `<div class="weapon-item-name">${ad.name} <span class="weapon-lv-tag">Lv.${lv}</span></div>` +
+        `<div class="weapon-item-sub">${getArmorLevelDesc(a.type, lv)}</div>` +
+        `<div class="weapon-item-special">${ad.desc}</div>` +
+      `</div>` +
+      `<div class="weapon-item-action">` +
+        (isEquipped ? '<span class="weapon-badge">裝備中</span>' : '<button class="armor-equip-btn">裝備</button>') +
+      `</div>`;
     if (!isEquipped) {
-      div.querySelector(".armor-equip-btn").addEventListener("click", () => {
-        progress.char.equippedArmor = a.type;
-        saveProgress(progress);
-        renderArmorInventory();
-        renderCharPanel();
-      });
+      const btn = div.querySelector(".armor-equip-btn");
+      if (btn) {
+        btn.addEventListener("click", () => {
+          progress.char.equippedArmor = a.type;
+          saveProgress(progress);
+          renderArmorInventory();
+          renderCharPanel();
+        });
+      }
     }
     container.appendChild(div);
-  });
+  }
 }
 
 function renderCharPanel() {
