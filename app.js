@@ -122,6 +122,7 @@ function loadProgress() {
     if (!p.char.milestonesClaimed) p.char.milestonesClaimed = {};
     if (p.char.welcomeRewardClaimed === undefined) p.char.welcomeRewardClaimed = false;
     if (p.learnedModeClears === undefined) p.learnedModeClears = 0;
+    if (!p.weakWordIds) p.weakWordIds = [];
     if (!p.wishes) p.wishes = ["", "", "", "", ""];
     if (!p.wishesClaimed) p.wishesClaimed = [false, false, false, false, false];
     // 重新計算 HP（新級距：每 12 級 +1，舊為每 5 級 +1）
@@ -147,7 +148,8 @@ function newProgress() {
     wishesClaimed: [false, false, false, false, false],
     dailyTasks: { date: "", enToZhDone: false, zhToEnDone: false },
     lastLoginDate: "",
-    learnedModeClears: 0
+    learnedModeClears: 0,
+    weakWordIds: []
   };
 }
 function saveProgress(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
@@ -417,6 +419,24 @@ function resetQuizSetup() {
   updateSelfStudyQuizBtn();
 }
 
+function buildLearnedPoolQuestions(count) {
+  const learnedSet = new Set(progress.learnedIds || []);
+  const weakSet = new Set((progress.weakWordIds || []).filter(id => learnedSet.has(id)));
+  const weakPool    = shuffle(wordsPool.filter(w => weakSet.has(w.id)));
+  const regularPool = shuffle(wordsPool.filter(w => learnedSet.has(w.id) && !weakSet.has(w.id)));
+  // 弱點字佔最多 60%，剩餘從一般字補齊
+  const weakSlots    = Math.min(Math.ceil(count * 0.6), weakPool.length);
+  const regularSlots = Math.min(count - weakSlots, regularPool.length);
+  let selected = [...weakPool.slice(0, weakSlots), ...regularPool.slice(0, regularSlots)];
+  // 若總數不足再補
+  if (selected.length < count) {
+    const usedIds = new Set(selected.map(w => w.id));
+    const extra = shuffle(wordsPool.filter(w => learnedSet.has(w.id) && !usedIds.has(w.id)));
+    selected = selected.concat(extra.slice(0, count - selected.length));
+  }
+  return shuffle(selected);
+}
+
 function buildAllPoolQuestions(count) {
   const learnedSet = new Set(progress.learnedIds || []);
   const unlearned = shuffle(wordsPool.filter(w => !learnedSet.has(w.id)));
@@ -465,9 +485,11 @@ function tryStartQuiz() {
     alert("待驗收字數不足，至少需要 2 字。"); resetQuizSetup(); return;
   }
   const numQuestions = state.quiz.range === "all" ? Math.min(25, pool.length)
-    : state.quiz.range === "selfStudy" ? pool.length  // 全部待驗收字都要考
+    : state.quiz.range === "selfStudy" ? pool.length
     : Math.min(10, pool.length);
-  state.quiz.questions = state.quiz.range === "all" ? buildAllPoolQuestions(25) : shuffle(pool).slice(0, numQuestions);
+  state.quiz.questions = state.quiz.range === "all" ? buildAllPoolQuestions(25)
+    : state.quiz.range === "learned" ? buildLearnedPoolQuestions(numQuestions)
+    : shuffle(pool).slice(0, numQuestions);
   state.quiz.pool = pool;
   state.quiz.idx = 0;
   state.quiz.correct = 0;
@@ -561,6 +583,10 @@ function answerQuestion(btn, isCorrect, q) {
     state.quiz.correct++;
     progress.quizCorrect++;
     battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
+    // 熟記模式答對 → 從弱點清單移除
+    if (state.quiz.range === "learned" && progress.weakWordIds) {
+      progress.weakWordIds = progress.weakWordIds.filter(id => id !== q.id);
+    }
     // 術士：每連答對 3 題，下一題觸發魔法消除
     if (getEquippedClassKey() === "sorcerer" && battleState.consecutiveCorrect % 3 === 0) {
       battleState.sorcererBuff = true;
@@ -612,6 +638,11 @@ function answerQuestion(btn, isCorrect, q) {
     battleState.consecutiveCorrect = 0;
     battleState.sorcererBuff = false;
     progress.quizWrong++;
+    // 熟記模式答錯 → 加入弱點清單
+    if (state.quiz.range === "learned") {
+      if (!progress.weakWordIds) progress.weakWordIds = [];
+      if (!progress.weakWordIds.includes(q.id)) progress.weakWordIds.push(q.id);
+    }
     fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
     fb.className = "quiz-feedback no";
     if (state.quiz.range === "learned") {
