@@ -2279,6 +2279,8 @@ function renderCharPanel() {
   set("char-exp-text", `${c.exp} / ${EXP_PER_LEVEL}`);
   set("char-max-hp", getPlayerMaxHp());
   set("char-attack", getPlayerAttack());
+  const totalDef = getArmorDefense() + getClassDefBonus();
+  set("char-defense", totalDef > 0 ? totalDef : 0);
   const equippedItem = getEquippedWeaponItem();
   if (equippedItem) {
     const wd = getWeaponTypeData(equippedItem.type);
