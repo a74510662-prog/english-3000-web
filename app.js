@@ -119,6 +119,7 @@ function loadProgress() {
     if (p.char.rainbowTickets === undefined) p.char.rainbowTickets = 0;
     if (!p.char.milestonesClaimed) p.char.milestonesClaimed = {};
     if (p.char.welcomeRewardClaimed === undefined) p.char.welcomeRewardClaimed = false;
+    if (p.learnedModeClears === undefined) p.learnedModeClears = 0;
     if (!p.wishes) p.wishes = ["", "", "", "", ""];
     if (!p.wishesClaimed) p.wishesClaimed = [false, false, false, false, false];
     // 重新計算 HP（新級距：每 12 級 +1，舊為每 5 級 +1）
@@ -143,7 +144,8 @@ function newProgress() {
     wishes: ["", "", "", "", ""],
     wishesClaimed: [false, false, false, false, false],
     dailyTasks: { date: "", enToZhDone: false, zhToEnDone: false },
-    lastLoginDate: ""
+    lastLoginDate: "",
+    learnedModeClears: 0
   };
 }
 function saveProgress(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
@@ -205,6 +207,19 @@ function loadTodayWords() {
   state.todayWords = seededShuffle(pool, seed).slice(0, 10);
   state.currentCard = 0;
   state.flipped = false;
+}
+
+function selfStudyAdd() {
+  const usedIds = new Set(state.todayWords.map(w => w.id));
+  const unlearned = wordsPool.filter(w => !progress.learnedIds.includes(w.id) && !usedIds.has(w.id));
+  const fallback  = wordsPool.filter(w => !usedIds.has(w.id));
+  const pool = unlearned.length >= 10 ? unlearned : fallback;
+  const extra = shuffle(pool).slice(0, 10);
+  if (extra.length === 0) { alert("已無更多單字可加入！"); return; }
+  state.todayWords = state.todayWords.concat(extra);
+  document.getElementById("card-total").textContent = state.todayWords.length;
+  const btn = document.getElementById("self-study-btn");
+  if (btn) btn.textContent = "已加 +" + (state.todayWords.length - 10) + " 字";
 }
 
 function reshuffleToday() {
@@ -662,6 +677,10 @@ function nextQuestion() {
 function finishQuiz() {
   stopQuestionTimer();
   playVictorySfx();
+  if (state.quiz.range === "learned") {
+    progress.learnedModeClears = (progress.learnedModeClears || 0) + 1;
+    saveProgress(progress);
+  }
   const chestEarned = checkSessionChallenge(state.quiz.mode);
   document.getElementById("quiz-game").classList.add("hidden");
   document.getElementById("quiz-result").classList.remove("hidden");
@@ -793,16 +812,16 @@ const ARMORS = [
 ];
 
 const WORD_MILESTONES = [
-  { id: "w50",   words: 50,   armor: "paradise_cape", lvl: 1, label: "熟記 50 字" },
-  { id: "w100",  words: 100,  armor: "dragon_coat",   lvl: 1, label: "熟記 100 字" },
-  { id: "w200",  words: 200,  armor: "magic_cloak",   lvl: 1, label: "熟記 200 字" },
-  { id: "w300",  words: 300,  armor: "paradise_cape", lvl: 2, label: "熟記 300 字" },
-  { id: "w500",  words: 500,  armor: "dragon_coat",   lvl: 2, label: "熟記 500 字" },
-  { id: "w750",  words: 750,  armor: "magic_cloak",   lvl: 2, label: "熟記 750 字" },
-  { id: "w1000", words: 1000, armor: "paradise_cape", lvl: 3, label: "熟記 1000 字" },
-  { id: "w1500", words: 1500, armor: "dragon_coat",   lvl: 3, label: "熟記 1500 字" },
-  { id: "w2000", words: 2000, armor: "magic_cloak",   lvl: 3, label: "熟記 2000 字" },
-  { id: "w3000", words: 3000, armor: "paradise_cape", lvl: 4, label: "熟記 3000 字（完全制霸）" },
+  { id: "c1",   clears: 1,   armor: "paradise_cape", lvl: 1, label: "熟記模式第 1 次破關" },
+  { id: "c3",   clears: 3,   armor: "dragon_coat",   lvl: 1, label: "熟記模式第 3 次破關" },
+  { id: "c5",   clears: 5,   armor: "magic_cloak",   lvl: 1, label: "熟記模式第 5 次破關" },
+  { id: "c10",  clears: 10,  armor: "paradise_cape", lvl: 2, label: "熟記模式第 10 次破關" },
+  { id: "c20",  clears: 20,  armor: "dragon_coat",   lvl: 2, label: "熟記模式第 20 次破關" },
+  { id: "c30",  clears: 30,  armor: "magic_cloak",   lvl: 2, label: "熟記模式第 30 次破關" },
+  { id: "c50",  clears: 50,  armor: "paradise_cape", lvl: 3, label: "熟記模式第 50 次破關" },
+  { id: "c75",  clears: 75,  armor: "dragon_coat",   lvl: 3, label: "熟記模式第 75 次破關" },
+  { id: "c100", clears: 100, armor: "magic_cloak",   lvl: 3, label: "熟記模式第 100 次破關" },
+  { id: "c200", clears: 200, armor: "paradise_cape", lvl: 4, label: "熟記模式第 200 次破關" },
 ];
 
 const CLASSES = [
@@ -1740,8 +1759,8 @@ function claimWelcomeReward() {
 function claimMilestoneArmor(milestoneId) {
   const m = WORD_MILESTONES.find(x => x.id === milestoneId);
   if (!m) return;
-  const learnedCount = (progress.learnedIds || []).length;
-  if (learnedCount < m.words) return;
+  const learnedClears = progress.learnedModeClears || 0;
+  if (learnedClears < m.clears) return;
   ensureChar();
   if (!progress.char.milestonesClaimed) progress.char.milestonesClaimed = {};
   if (progress.char.milestonesClaimed[milestoneId]) return;
@@ -1766,52 +1785,66 @@ function claimMilestoneArmor(milestoneId) {
 }
 
 function renderAchievements() {
-  const learnedCount = (progress.learnedIds || []).length;
   ensureChar();
+  const learnedClears = progress.learnedModeClears || 0;
 
   // 歡迎獎勵
   const welcomeEl = document.getElementById("achievement-welcome-card");
   if (welcomeEl) {
     const claimed = progress.char.welcomeRewardClaimed;
-    welcomeEl.innerHTML = `
-      <div class="ach-icon">🎁</div>
-      <div class="ach-info">
-        <div class="ach-title">初次學習獎勵</div>
-        <div class="ach-desc">開始使用・獲得 📦 寶箱 ×100</div>
-      </div>
-      <div class="ach-action">
-        ${claimed
+    welcomeEl.innerHTML =
+      '<div class="ach-icon">🎁</div>' +
+      '<div class="ach-info">' +
+        '<div class="ach-title">初次學習獎勵</div>' +
+        '<div class="ach-desc">開始使用・獲得 📦 寶箱 ×100</div>' +
+      '</div>' +
+      '<div class="ach-action">' +
+        (claimed
           ? '<span class="ach-done">✅ 已領取</span>'
-          : '<button class="ach-claim-btn" onclick="claimWelcomeReward()">領取</button>'}
-      </div>`;
+          : '<button class="ach-claim-btn" id="welcome-claim-btn">領取</button>') +
+      '</div>';
+    if (!claimed) {
+      const btn = welcomeEl.querySelector("#welcome-claim-btn");
+      if (btn) btn.addEventListener("click", claimWelcomeReward);
+    }
   }
 
   // 里程碑列表
   const listEl = document.getElementById("achievement-milestone-list");
   if (!listEl) return;
   listEl.innerHTML = "";
+
+  // 破關次數顯示
+  const counter = document.createElement("div");
+  counter.className = "ach-clear-counter";
+  counter.textContent = "熟記模式累計破關：" + learnedClears + " 次";
+  listEl.appendChild(counter);
+
   WORD_MILESTONES.forEach(m => {
-    const claimed = !!(progress.char.milestonesClaimed?.[m.id]);
-    const eligible = learnedCount >= m.words;
-    const armorData = ARMORS.find(a => a.key === m.armor);
+    const claimed = !!(progress.char.milestonesClaimed && progress.char.milestonesClaimed[m.id]);
+    const eligible = learnedClears >= m.clears;
+    const armorData = ARMORS.find(function(a) { return a.key === m.armor; });
     const card = document.createElement("div");
     card.className = "ach-card" + (claimed ? " ach-claimed" : "");
-    card.innerHTML = `
-      <div class="ach-icon">${eligible ? armorData.emoji : "🔒"}</div>
-      <div class="ach-info">
-        <div class="ach-title">${m.label}</div>
-        <div class="ach-desc">${armorData.emoji} ${armorData.name} Lv.${m.lvl}・${getArmorLevelDesc(m.armor, m.lvl)}</div>
-        <div class="ach-progress">${learnedCount} / ${m.words} 字</div>
-      </div>
-      <div class="ach-action">
-        ${claimed
-          ? '<span class="ach-done">✅ 已領取</span>'
-          : eligible
-            ? `<button class="ach-claim-btn" data-mid="${m.id}">領取</button>`
-            : `<span class="ach-locked">${learnedCount}/${m.words}</span>`}
-      </div>`;
+    const actionHtml = claimed
+      ? '<span class="ach-done">✅ 已領取</span>'
+      : eligible
+        ? '<button class="ach-claim-btn">領取</button>'
+        : '<span class="ach-locked">' + learnedClears + "/" + m.clears + ' 次</span>';
+    card.innerHTML =
+      '<div class="ach-icon">' + (claimed ? armorData.emoji : eligible ? armorData.emoji : "🔒") + '</div>' +
+      '<div class="ach-info">' +
+        '<div class="ach-title">' + m.label + '</div>' +
+        '<div class="ach-desc">' + armorData.emoji + " " + armorData.name + " Lv." + m.lvl + "・" + getArmorLevelDesc(m.armor, m.lvl) + '</div>' +
+        '<div class="ach-progress">' + learnedClears + " / " + m.clears + " 次</div>" +
+      '</div>' +
+      '<div class="ach-action">' + actionHtml + '</div>';
     if (!claimed && eligible) {
-      card.querySelector(".ach-claim-btn").addEventListener("click", () => claimMilestoneArmor(m.id));
+      const btn = card.querySelector(".ach-claim-btn");
+      if (btn) {
+        const mid = m.id;
+        btn.addEventListener("click", function() { claimMilestoneArmor(mid); });
+      }
     }
     listEl.appendChild(card);
   });
@@ -2427,6 +2460,7 @@ document.getElementById("back-to-today").addEventListener("click", () => {
     document.getElementById("the-card")?.classList.toggle("flipped");
   });
   document.getElementById("mark-done").addEventListener("click", markTodayDone);
+  document.getElementById("self-study-btn").addEventListener("click", selfStudyAdd);
 
   document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.addEventListener("click", () => switchView(btn.dataset.view));

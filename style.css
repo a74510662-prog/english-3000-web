@@ -391,16 +391,17 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  justify-content: flex-start;
+  gap: 0;
   box-shadow: 2px 0 8px rgba(0,0,0,0.08);
   z-index: 10;
-  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  overflow-y: auto;
+  padding: max(env(safe-area-inset-top), 8px) 0 max(env(safe-area-inset-bottom), 8px);
 }
 .nav-btn {
   background: none;
   border: none;
-  padding: 14px 0;
+  padding: 10px 0;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -1247,6 +1248,21 @@ body {
 .intro-eq { color: var(--accent); font-weight: bold; }
 
 /* === 成就頁 === */
+.self-study-btn {
+  display: block; width: 100%; margin-top: 8px;
+  padding: 10px 0;
+  background: #fff; border: 1.5px dashed var(--primary);
+  color: var(--primary); border-radius: 10px;
+  font-size: 0.95rem; cursor: pointer;
+}
+.self-study-btn:active { background: #eef4fa; }
+
+.ach-clear-counter {
+  text-align: center; font-size: 0.88rem; color: var(--primary);
+  background: #eef4fa; border-radius: 8px;
+  padding: 8px 12px; margin-bottom: 10px; font-weight: bold;
+}
+
 .ach-section-title {
   font-size: 0.95rem; color: var(--text-light); margin: 12px 0 8px;
   border-bottom: 1px solid var(--border); padding-bottom: 6px;
