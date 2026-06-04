@@ -289,7 +289,6 @@ function renderCard() {
     });
   }
 
-  updateMarkDoneBtn();
 }
 
 function toggleLearned(id) {
@@ -302,34 +301,6 @@ function toggleLearned(id) {
   renderCard();
 }
 
-function updateMarkDoneBtn() {
-  const btn = document.getElementById("mark-done");
-  if (progress.completedDates.includes(state.viewDate)) {
-    btn.textContent = "✓ 今日已完成";
-    btn.classList.add("done");
-  } else {
-    btn.textContent = "標記今日已完成";
-    btn.classList.remove("done");
-  }
-}
-
-function markTodayDone() {
-  const today = state.viewDate;
-  if (progress.completedDates.includes(today)) {
-    if (!confirm("今日已標記完成，要取消嗎?")) return;
-    progress.completedDates = progress.completedDates.filter(d => d !== today);
-    progress.learnedIds = progress.learnedIds.filter(id => !state.todayWords.some(w => w.id === id) || progress.learnedIds.filter(x => x === id).length > 1);
-  } else {
-    progress.completedDates.push(today);
-    state.todayWords.forEach(w => {
-      if (!progress.learnedIds.includes(w.id)) progress.learnedIds.push(w.id);
-    });
-    updateStreak();
-    checkClassUnlocks();
-  }
-  saveProgress(progress);
-  updateMarkDoneBtn();
-}
 
 function updateStreak() {
   const today = todayDateString();
@@ -1978,6 +1949,16 @@ function awardDailyChallenge() {
   if (progress.dailyTasks.challengeDone) return;
   if (!progress.dailyTasks.enToZhDone || !progress.dailyTasks.zhToEnDone) return;
   progress.dailyTasks.challengeDone = true;
+  // 每日挑戰完成 → 今日字數全部標記為已熟記
+  const today = todayDateString();
+  if (!progress.completedDates.includes(today)) {
+    progress.completedDates.push(today);
+    state.todayWords.forEach(w => {
+      if (!progress.learnedIds.includes(w.id)) progress.learnedIds.push(w.id);
+    });
+    updateStreak();
+    checkClassUnlocks();
+  }
   const expGain = Math.floor(Math.random() * 3) + 1;
   addExp(expGain);
   saveProgress(progress);
@@ -2178,11 +2159,11 @@ function checkSessionChallenge(mode) {
 function showDailyChallengeReward(expGain) {
   const toast = document.getElementById("challenge-toast");
   if (!toast) return;
-  toast.textContent = `🎉 每日挑戰完成！獲得 EXP +${expGain}`;
+  toast.textContent = `🎉 每日挑戰完成！今日單字已熟記・EXP +${expGain}`;
   toast.classList.remove("hidden", "show");
   void toast.offsetWidth;
   toast.classList.add("show");
-  setTimeout(() => toast.classList.add("hidden"), 2800);
+  setTimeout(() => toast.classList.add("hidden"), 3200);
 }
 
 function renderWeaponInventory() {
@@ -2514,7 +2495,6 @@ document.getElementById("back-to-today").addEventListener("click", () => {
     state.flipped = !state.flipped;
     document.getElementById("the-card")?.classList.toggle("flipped");
   });
-  document.getElementById("mark-done").addEventListener("click", markTodayDone);
   document.getElementById("self-study-btn").addEventListener("click", selfStudyAdd);
 
   document.querySelectorAll(".nav-btn").forEach(btn => {
