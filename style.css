@@ -1245,3 +1245,58 @@ body {
   animation: intro-sub-in 0.5s ease 0.9s both;
 }
 .intro-eq { color: var(--accent); font-weight: bold; }
+
+/* === 成就頁 === */
+.ach-section-title {
+  font-size: 0.95rem; color: var(--text-light); margin: 12px 0 8px;
+  border-bottom: 1px solid var(--border); padding-bottom: 6px;
+}
+.ach-card {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--card); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 8px;
+  box-shadow: var(--shadow); border: 1.5px solid var(--border);
+}
+.ach-card.ach-claimed { opacity: 0.6; }
+.ach-welcome { border-color: var(--accent); background: #fff8f0; }
+.ach-icon { font-size: 1.8rem; flex-shrink: 0; }
+.ach-info { flex: 1; min-width: 0; }
+.ach-title { font-weight: bold; font-size: 0.9rem; }
+.ach-desc { font-size: 0.78rem; color: var(--text-light); margin-top: 2px; }
+.ach-progress { font-size: 0.75rem; color: var(--primary); margin-top: 2px; }
+.ach-action { flex-shrink: 0; }
+.ach-claim-btn {
+  padding: 7px 14px; background: var(--accent); color: white;
+  border: none; border-radius: 8px; font-size: 0.88rem; cursor: pointer;
+}
+.ach-claim-btn:active { opacity: 0.8; }
+.ach-done { font-size: 0.9rem; color: var(--correct); }
+.ach-locked { font-size: 0.78rem; color: var(--text-light); }
+
+/* === 寶箱多開按鈕列 === */
+.chest-qty-row {
+  display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;
+}
+.chest-qty-btn {
+  flex: 1; min-width: 56px; padding: 8px 4px;
+  background: var(--primary); color: white;
+  border: none; border-radius: 8px; font-size: 0.88rem; cursor: pointer;
+}
+.chest-qty-btn:active { background: var(--primary-light); }
+
+/* === 熟記模式 BOSS 狀態列 === */
+.lm-battle-status {
+  background: rgba(0,0,0,0.06); border-radius: 10px;
+  padding: 6px 12px; margin: 4px 0; font-size: 0.82rem;
+}
+.lm-smalls-row { letter-spacing: 3px; margin-bottom: 4px; }
+.lm-boss-row { display: flex; align-items: center; gap: 8px; color: var(--text-light); }
+.lm-boss-row.lm-boss-active { color: #e74c3c; font-weight: bold; }
+.lm-boss-hp { font-weight: bold; font-size: 0.8rem; white-space: nowrap; }
+.lm-boss-bar-bg {
+  flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.lm-boss-bar-fill {
+  height: 100%; background: #e74c3c; border-radius: 3px;
+  transition: width 0.3s;
+}

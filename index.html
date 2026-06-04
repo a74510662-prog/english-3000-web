@@ -194,7 +194,12 @@
         <div class="inventory-row">
           <span>📦 寶箱</span>
           <span id="inv-chests">0</span>
-          <button id="open-chest-btn" class="inv-btn chest-btn">開啟</button>
+        </div>
+        <div class="chest-qty-row">
+          <button class="chest-qty-btn" data-count="1">開 1</button>
+          <button class="chest-qty-btn" data-count="5">開 5</button>
+          <button class="chest-qty-btn" data-count="10">開 10</button>
+          <button class="chest-qty-btn" data-count="-1">全開</button>
         </div>
         <div class="inventory-row">
           <span>🌈 彩虹券</span>
@@ -272,6 +277,13 @@
       <div id="shop-wish-list"></div>
     </section>
 
+    <!-- 成就頁 -->
+    <section id="view-achievement" class="view">
+      <div id="achievement-welcome-card" class="ach-card ach-welcome"></div>
+      <h3 class="ach-section-title">🏅 熟記單字里程碑</h3>
+      <div id="achievement-milestone-list"></div>
+    </section>
+
     <!-- 武器庫頁 -->
     <section id="view-weapon" class="view">
       <div class="weapon-page-header">
@@ -323,6 +335,9 @@
     </button>
     <button class="nav-btn" data-view="shop">
       <span class="nav-icon">🏪</span><span>商店</span>
+    </button>
+    <button class="nav-btn" data-view="achievement">
+      <span class="nav-icon">🏆</span><span>成就</span>
     </button>
   </nav>
 
