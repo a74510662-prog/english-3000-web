@@ -713,11 +713,11 @@ function answerQuestion(btn, isCorrect, q) {
       setTimeout(() => {
         if (battleState.playerHp <= 0) { if (isLastQ) document.getElementById("next-question").classList.remove("hidden"); return; }
         if (!gameEl || gameEl.classList.contains("hidden")) return;
-        showBattleEffect("🐉 BOSS 攻擊 -3", "#e74c3c");
+        showBattleEffect("🐉 BOSS 攻擊 -1", "#e74c3c");
         setTimeout(() => {
           if (battleState.playerHp <= 0) return;
           if (!gameEl || gameEl.classList.contains("hidden")) return;
-          triggerMonsterAttack(3);
+          triggerMonsterAttack(1);
           if (isLastQ) setTimeout(() => { if (battleState.playerHp > 0) document.getElementById("next-question").classList.remove("hidden"); }, 1900);
         }, 600);
       }, 1000);
@@ -726,11 +726,11 @@ function answerQuestion(btn, isCorrect, q) {
       setTimeout(() => {
         if (battleState.playerHp <= 0) { if (isLastQ) document.getElementById("next-question").classList.remove("hidden"); return; }
         if (!gameEl || gameEl.classList.contains("hidden")) return;
-        showBattleEffect("🐉 BOSS 爆擊 -5！", "#e74c3c");
+        showBattleEffect("🐉 BOSS 爆擊 -3！", "#e74c3c");
         setTimeout(() => {
           if (battleState.playerHp <= 0) return;
           if (!gameEl || gameEl.classList.contains("hidden")) return;
-          triggerMonsterAttack(5);
+          triggerMonsterAttack(3);
           if (isLastQ) setTimeout(() => { if (battleState.playerHp > 0) document.getElementById("next-question").classList.remove("hidden"); }, 1900);
         }, 600);
       }, 1200);
