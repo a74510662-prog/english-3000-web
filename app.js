@@ -57,6 +57,8 @@ function selectUser(name) {
   updateCoinsDisplay();
   loadTodayWords();
   renderCard();
+  updateSelfStudyBtnState();
+  updateSelfStudyQuizBtn();
   const activeView = document.querySelector(".view.active");
   if (activeView) {
     const viewName = activeView.id.replace("view-", "");
@@ -204,22 +206,78 @@ function loadTodayWords() {
   const seed = dateSeed(state.viewDate) + progress.shuffleOffset + userNameSeed(currentUser);
   const unlearned = wordsPool.filter(w => !progress.learnedIds.includes(w.id));
   const pool = unlearned.length >= 10 ? unlearned : wordsPool;
-  state.todayWords = seededShuffle(pool, seed).slice(0, 10);
+  const base = seededShuffle(pool, seed).slice(0, 10);
+  state.todayWords = [...base];
+  state.originalTodayWords = [...base];
+  // 還原今日自主學習字（頁面重整後仍可瀏覽）
+  ensureDailyTasks();
+  const pendingIds = new Set(progress.dailyTasks.selfStudyPendingIds || []);
+  if (pendingIds.size > 0) {
+    const baseIds = new Set(base.map(w => w.id));
+    const restored = wordsPool.filter(w => pendingIds.has(w.id) && !baseIds.has(w.id));
+    state.todayWords = state.todayWords.concat(restored);
+  }
   state.currentCard = 0;
   state.flipped = false;
 }
 
 function selfStudyAdd() {
+  ensureDailyTasks();
+  const alreadyAdded = progress.dailyTasks.selfStudyAdded || 0;
+  if (alreadyAdded >= 30) { alert("今日自主學習已達上限 30 字！"); return; }
+  const toAdd = Math.min(10, 30 - alreadyAdded);
   const usedIds = new Set(state.todayWords.map(w => w.id));
   const unlearned = wordsPool.filter(w => !progress.learnedIds.includes(w.id) && !usedIds.has(w.id));
   const fallback  = wordsPool.filter(w => !usedIds.has(w.id));
-  const pool = unlearned.length >= 10 ? unlearned : fallback;
-  const extra = shuffle(pool).slice(0, 10);
+  const pool = unlearned.length >= toAdd ? unlearned : fallback;
+  const extra = shuffle(pool).slice(0, toAdd);
   if (extra.length === 0) { alert("已無更多單字可加入！"); return; }
+  // 加入今日卡片（可瀏覽）
   state.todayWords = state.todayWords.concat(extra);
   document.getElementById("card-total").textContent = state.todayWords.length;
+  // 加入待驗收清單
+  const pending = progress.dailyTasks.selfStudyPendingIds;
+  extra.forEach(w => { if (!pending.includes(w.id)) pending.push(w.id); });
+  progress.dailyTasks.selfStudyAdded = alreadyAdded + extra.length;
+  saveProgress(progress);
+  updateSelfStudyBtnState();
+  updateSelfStudyQuizBtn();
+}
+
+function updateSelfStudyBtnState() {
+  ensureDailyTasks();
   const btn = document.getElementById("self-study-btn");
-  if (btn) btn.textContent = "已加 +" + (state.todayWords.length - 10) + " 字";
+  if (!btn) return;
+  const added = progress.dailyTasks.selfStudyAdded || 0;
+  const remaining = 30 - added;
+  if (remaining > 0) {
+    btn.textContent = `＋自主學習(剩${remaining}字)`;
+    btn.disabled = false;
+  } else {
+    btn.textContent = "今日上限(30字)";
+    btn.disabled = true;
+  }
+}
+
+function updateSelfStudyQuizBtn() {
+  ensureDailyTasks();
+  const btn = document.getElementById("quiz-range-selfstudy");
+  if (!btn) return;
+  const pending = progress.dailyTasks.selfStudyPendingIds || [];
+  const enDone = progress.dailyTasks.selfStudyEnToZhDone;
+  const zhDone = progress.dailyTasks.selfStudyZhToEnDone;
+  const reward = btn.querySelector(".range-reward");
+  if (pending.length > 0) {
+    btn.disabled = false;
+    const hint = enDone ? "中翻英待完成" : zhDone ? "英翻中待完成" : `${pending.length}字`;
+    if (reward) reward.textContent = hint;
+  } else if (enDone && zhDone) {
+    btn.disabled = true;
+    if (reward) reward.textContent = "✅";
+  } else {
+    btn.disabled = true;
+    if (reward) reward.textContent = "0字";
+  }
 }
 
 function reshuffleToday() {
@@ -356,6 +414,7 @@ function resetQuizSetup() {
   document.getElementById("quiz-defeat").classList.add("hidden");
   document.querySelectorAll(".quiz-mode-group button, .quiz-range-group button").forEach(b => b.classList.remove("active"));
   state.quiz = { mode: null, range: null, questions: [], idx: 0, correct: 0, coinsEarned: 0 };
+  updateSelfStudyQuizBtn();
 }
 
 function buildAllPoolQuestions(count) {
@@ -387,16 +446,27 @@ function shuffle(arr) {
 function tryStartQuiz() {
   if (!state.quiz.mode || !state.quiz.range) return;
   let pool = [];
-  if (state.quiz.range === "today") pool = state.todayWords;
+  if (state.quiz.range === "today") pool = state.originalTodayWords || state.todayWords.slice(0, 10);
   else if (state.quiz.range === "learned") pool = wordsPool.filter(w => progress.learnedIds.includes(w.id));
+  else if (state.quiz.range === "selfStudy") {
+    ensureDailyTasks();
+    const pendingIds = new Set(progress.dailyTasks.selfStudyPendingIds || []);
+    pool = wordsPool.filter(w => pendingIds.has(w.id));
+    if (pool.length === 0) { alert("目前沒有待驗收的自主學習單字。"); resetQuizSetup(); return; }
+  }
   else pool = wordsPool;
 
-  if (pool.length < 4) {
+  if (pool.length < 4 && state.quiz.range !== "selfStudy") {
     alert("題庫不足 4 字，無法產生選項。請先學完一些字或選擇較大範圍。");
     resetQuizSetup();
     return;
   }
-  const numQuestions = state.quiz.range === "all" ? Math.min(25, pool.length) : Math.min(10, pool.length);
+  if (pool.length < 2 && state.quiz.range === "selfStudy") {
+    alert("待驗收字數不足，至少需要 2 字。"); resetQuizSetup(); return;
+  }
+  const numQuestions = state.quiz.range === "all" ? Math.min(25, pool.length)
+    : state.quiz.range === "selfStudy" ? pool.length  // 全部待驗收字都要考
+    : Math.min(10, pool.length);
   state.quiz.questions = state.quiz.range === "all" ? buildAllPoolQuestions(25) : shuffle(pool).slice(0, numQuestions);
   state.quiz.pool = pool;
   state.quiz.idx = 0;
@@ -496,8 +566,8 @@ function answerQuestion(btn, isCorrect, q) {
       battleState.sorcererBuff = true;
       showBattleEffect("🪄蓄積中…", "#a29bfe");
     }
-    // 答對 +1 金幣（僅熟記模式），每日總上限 200 枚
-    if (state.quiz.range === "learned") {
+    // 答對 +1 金幣（熟記模式 & 自主學習測驗），每日總上限 200 枚
+    if (state.quiz.range === "learned" || state.quiz.range === "selfStudy") {
       ensureDailyTasks();
       const todayCoins = progress.dailyTasks.dailyCoinTotal || 0;
       if (todayCoins < 200) {
@@ -545,8 +615,8 @@ function answerQuestion(btn, isCorrect, q) {
     fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
     fb.className = "quiz-feedback no";
     if (state.quiz.range === "learned") {
-      // 小怪攻擊（ATK1），BOSS 爆擊延遲在下方統一處理
-      if (battleState.lmPhase === "smalls") triggerMonsterAttack(1);
+      // 小怪攻擊（ATK3），BOSS 爆擊延遲在下方統一處理
+      if (battleState.lmPhase === "smalls") triggerMonsterAttack(3);
     } else {
       triggerMonsterAttack(state.quiz.range === "all" ? getDragonDamage() : undefined);
     }
@@ -606,11 +676,11 @@ function answerQuestion(btn, isCorrect, q) {
       setTimeout(() => {
         if (battleState.playerHp <= 0) { if (isLastQ) document.getElementById("next-question").classList.remove("hidden"); return; }
         if (!gameEl || gameEl.classList.contains("hidden")) return;
-        showBattleEffect("🐉 BOSS 攻擊 -2", "#e74c3c");
+        showBattleEffect("🐉 BOSS 攻擊 -4", "#e74c3c");
         setTimeout(() => {
           if (battleState.playerHp <= 0) return;
           if (!gameEl || gameEl.classList.contains("hidden")) return;
-          triggerMonsterAttack(2);
+          triggerMonsterAttack(4);
           if (isLastQ) setTimeout(() => { if (battleState.playerHp > 0) document.getElementById("next-question").classList.remove("hidden"); }, 1900);
         }, 600);
       }, 1000);
@@ -622,11 +692,11 @@ function answerQuestion(btn, isCorrect, q) {
       setTimeout(() => {
         if (battleState.playerHp <= 0) { if (isLastQ) document.getElementById("next-question").classList.remove("hidden"); return; }
         if (!gameEl || gameEl.classList.contains("hidden")) return;
-        showBattleEffect("🐉 BOSS 爆擊 -4！", "#e74c3c");
+        showBattleEffect("🐉 BOSS 爆擊 -6！", "#e74c3c");
         setTimeout(() => {
           if (battleState.playerHp <= 0) return;
           if (!gameEl || gameEl.classList.contains("hidden")) return;
-          triggerMonsterAttack(4);
+          triggerMonsterAttack(6);
           if (isLastQ) setTimeout(() => { if (battleState.playerHp > 0) document.getElementById("next-question").classList.remove("hidden"); }, 1900);
         }, 600);
       }, 1200);
@@ -652,7 +722,9 @@ function finishQuiz() {
     progress.learnedModeClears = (progress.learnedModeClears || 0) + 1;
     saveProgress(progress);
   }
-  const chestEarned = checkSessionChallenge(state.quiz.mode);
+  const chestEarned = state.quiz.range === "selfStudy"
+    ? checkSelfStudyChallenge(state.quiz.mode)
+    : checkSessionChallenge(state.quiz.mode);
   document.getElementById("quiz-game").classList.add("hidden");
   document.getElementById("quiz-result").classList.remove("hidden");
   const total = state.quiz.questions.length;
@@ -686,7 +758,22 @@ function finishQuiz() {
     }
   }
   chestLine = coinLine + perfectLine;
-  if (state.quiz.range === "all") {
+  if (state.quiz.range === "selfStudy") {
+    ensureDailyTasks();
+    if (state.quiz.correct === total) {
+      const enD = progress.dailyTasks.selfStudyEnToZhDone;
+      const zhD = progress.dailyTasks.selfStudyZhToEnDone;
+      const pendingLeft = (progress.dailyTasks.selfStudyPendingIds || []).length;
+      if (enD && zhD && pendingLeft === 0) {
+        chestLine += `<br><span style="color:#27ae60;font-size:0.95rem">🌟 自主學習完成！所有單字已熟記・📦 ×1</span>`;
+      } else {
+        const need = enD ? "中翻英" : "英翻中";
+        chestLine += `<br><span style="color:#f4a261;font-size:0.95rem">✅ 過關！再完成「${need}」即標記熟記</span>`;
+      }
+    } else {
+      chestLine += `<br><span style="color:var(--text-light);font-size:0.9rem">⚠️ 需全對才能標記熟記（${state.quiz.correct}/${total}）</span>`;
+    }
+  } else if (state.quiz.range === "all") {
     if (state.quiz.correct === total) {
       ensureChar();
       progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 1;
@@ -1903,7 +1990,7 @@ function buyItem(item, cost) {
 function ensureDailyTasks() {
   const today = todayDateString();
   if (!progress.dailyTasks || progress.dailyTasks.date !== today) {
-    progress.dailyTasks = { date: today, enToZhDone: false, zhToEnDone: false, monstersKilled: 0, challengeDone: false, bonusKillsEnToZh: 0, bonusKillsZhToEn: 0, dailyCoinTotal: 0, perfectCoinEnToZh: false, perfectCoinZhToEn: false };
+    progress.dailyTasks = { date: today, enToZhDone: false, zhToEnDone: false, monstersKilled: 0, challengeDone: false, bonusKillsEnToZh: 0, bonusKillsZhToEn: 0, dailyCoinTotal: 0, perfectCoinEnToZh: false, perfectCoinZhToEn: false, selfStudyAdded: 0, selfStudyPendingIds: [], selfStudyEnToZhDone: false, selfStudyZhToEnDone: false };
     saveProgress(progress);
   } else {
     if (progress.dailyTasks.monstersKilled === undefined) progress.dailyTasks.monstersKilled = 0;
@@ -1913,6 +2000,10 @@ function ensureDailyTasks() {
     if (progress.dailyTasks.dailyCoinTotal === undefined) progress.dailyTasks.dailyCoinTotal = 0;
     if (progress.dailyTasks.perfectCoinEnToZh === undefined) progress.dailyTasks.perfectCoinEnToZh = false;
     if (progress.dailyTasks.perfectCoinZhToEn === undefined) progress.dailyTasks.perfectCoinZhToEn = false;
+    if (progress.dailyTasks.selfStudyAdded === undefined) progress.dailyTasks.selfStudyAdded = 0;
+    if (!progress.dailyTasks.selfStudyPendingIds) progress.dailyTasks.selfStudyPendingIds = [];
+    if (progress.dailyTasks.selfStudyEnToZhDone === undefined) progress.dailyTasks.selfStudyEnToZhDone = false;
+    if (progress.dailyTasks.selfStudyZhToEnDone === undefined) progress.dailyTasks.selfStudyZhToEnDone = false;
   }
 }
 
@@ -2141,8 +2232,41 @@ function showBattleChestBonus() {
   setTimeout(() => el.remove(), 1200);
 }
 
+function checkSelfStudyChallenge(mode) {
+  ensureDailyTasks();
+  const pending = progress.dailyTasks.selfStudyPendingIds || [];
+  if (pending.length === 0) return false;
+  const total = state.quiz.questions.length;
+  if (state.quiz.correct < total) return false;
+  const key = mode === "en-to-zh" ? "selfStudyEnToZhDone" : "selfStudyZhToEnDone";
+  if (progress.dailyTasks[key]) return false;
+  progress.dailyTasks[key] = true;
+  if (progress.dailyTasks.selfStudyEnToZhDone && progress.dailyTasks.selfStudyZhToEnDone) {
+    // 兩關都過 → 標記熟記
+    const markedIds = [...pending];
+    markedIds.forEach(id => { if (!progress.learnedIds.includes(id)) progress.learnedIds.push(id); });
+    progress.dailyTasks.selfStudyPendingIds = [];
+    checkClassUnlocks();
+    ensureChar();
+    progress.char.chests++;
+    saveProgress(progress);
+    const toast = document.getElementById("challenge-toast");
+    if (toast) {
+      toast.textContent = `🌟 自主學習完成！${markedIds.length} 個單字已熟記・獲得寶箱 ×1`;
+      toast.classList.remove("hidden", "show");
+      void toast.offsetWidth;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.add("hidden"), 3500);
+    }
+  } else {
+    saveProgress(progress);
+  }
+  updateSelfStudyQuizBtn();
+  return true;
+}
+
 function checkSessionChallenge(mode) {
-  if (state.quiz && (state.quiz.range === "learned" || state.quiz.range === "all")) return false;
+  if (state.quiz && (state.quiz.range === "learned" || state.quiz.range === "all" || state.quiz.range === "selfStudy")) return false;
   const total = state.quiz.questions.length;
   if (state.quiz.correct < total) return false;
   ensureChar();
