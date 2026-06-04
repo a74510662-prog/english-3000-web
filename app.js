@@ -1488,8 +1488,8 @@ function handleLearnedMonsterDeath(monsterEl) {
     battleState.hp = 500;
     battleState.monsterMaxHp = 500;
     monsterEl.textContent = "🐉";
-    showBattleEffect("🏆 BOSS 討伐！💰+10", "#ffd700");
-    addCoins(10);
+    showBattleEffect("🏆 BOSS 討伐！💰+20", "#ffd700");
+    addCoins(20);
     monsterEl.className = "battle-char appearing";
     updateMonsterHP();
     updateLearnedBattleDisplay();
