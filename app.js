@@ -188,12 +188,12 @@ function switchView(view) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.getElementById(`view-${view}`).classList.add("active");
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-  const titles = { cards: "今日單字", quiz: "隨堂測驗", progress: "學習進度", char: "角色道具", weapon: "武器庫", shop: "商店", achievement: "成就" };
+  const titles = { cards: "今日單字", quiz: "隨堂測驗", progress: "學習進度", char: "角色道具", weapon: "裝備庫", shop: "商店", achievement: "成就" };
   document.getElementById("page-title").textContent = titles[view] || view;
   if (view === "progress") renderProgress();
   if (view === "quiz") resetQuizSetup();
   if (view === "char") renderCharPanel();
-  if (view === "weapon") renderWeaponInventory();
+  if (view === "weapon") { renderWeaponInventory(); renderArmorInventory(); }
   if (view === "shop") renderShop();
   if (view === "achievement") renderAchievements();
 }
@@ -2241,6 +2241,59 @@ function renderWeaponInventory() {
             charWeapon.textContent = `${wd.emoji} ${wd.name}${item.level > 0 ? ` Lv.${item.level}` : ""} (+${getPlayerAttack() - 1})`;
           }
         }
+      });
+    }
+    container.appendChild(div);
+  });
+}
+
+function renderArmorInventory() {
+  const container = document.getElementById("armor-inventory");
+  if (!container) return;
+  const inv = (progress.char && progress.char.armorInventory) ? progress.char.armorInventory : [];
+  const equipped = (progress.char && progress.char.equippedArmor) || null;
+
+  const equippedDisplay = document.getElementById("armor-equipped-display");
+  if (equippedDisplay) {
+    const eq = inv.find(x => x.type === equipped);
+    if (eq) {
+      const ad = getArmorData(eq.type);
+      equippedDisplay.textContent = `${ad.emoji} ${ad.name} Lv.${eq.level || 1}`;
+    } else {
+      equippedDisplay.textContent = "無";
+    }
+  }
+
+  if (inv.length === 0) {
+    container.innerHTML = '<div class="weapon-empty">尚無防具，累積連續學習或達到里程碑獲得</div>';
+    return;
+  }
+  container.innerHTML = "";
+  inv.forEach(a => {
+    const ad = getArmorData(a.type);
+    if (!ad) return;
+    const isEquipped = a.type === equipped;
+    const lv = a.level || 1;
+    const div = document.createElement("div");
+    div.className = "weapon-item" + (isEquipped ? " equipped" : "");
+    div.innerHTML =
+      '<div class="weapon-item-icon">' + ad.emoji + '</div>' +
+      '<div class="weapon-item-info">' +
+        '<div class="weapon-item-name">' + ad.name + ' <span class="weapon-lv-tag">Lv.' + lv + '</span></div>' +
+        '<div class="weapon-item-sub">' + getArmorLevelDesc(a.type, lv) + '</div>' +
+        '<div class="weapon-item-special">' + ad.desc + '</div>' +
+      '</div>' +
+      '<div class="weapon-item-action">' +
+        (isEquipped
+          ? '<span class="weapon-badge">裝備中</span>'
+          : '<button class="armor-equip-btn">裝備</button>') +
+      '</div>';
+    if (!isEquipped) {
+      div.querySelector(".armor-equip-btn").addEventListener("click", () => {
+        progress.char.equippedArmor = a.type;
+        saveProgress(progress);
+        renderArmorInventory();
+        renderCharPanel();
       });
     }
     container.appendChild(div);

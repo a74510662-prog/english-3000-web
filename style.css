@@ -67,7 +67,9 @@ body {
 
 /* 卡片瀏覽 */
 .card-counter {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-light);
   margin-bottom: 12px;
   font-size: 0.9rem;
@@ -1248,14 +1250,20 @@ body {
 .intro-eq { color: var(--accent); font-weight: bold; }
 
 /* === 成就頁 === */
-.self-study-btn {
-  display: block; width: 100%; margin-top: 8px;
-  padding: 10px 0;
-  background: #fff; border: 1.5px dashed var(--primary);
-  color: var(--primary); border-radius: 10px;
-  font-size: 0.95rem; cursor: pointer;
+.self-study-btn-inline {
+  margin-left: 10px;
+  padding: 3px 10px;
+  background: #eef4fa; border: 1.5px solid var(--primary);
+  color: var(--primary); border-radius: 20px;
+  font-size: 0.78rem; cursor: pointer; white-space: nowrap;
 }
-.self-study-btn:active { background: #eef4fa; }
+.self-study-btn-inline:active { background: var(--primary); color: white; }
+
+.equip-section-header {
+  font-size: 0.95rem; color: var(--text-light);
+  margin: 14px 0 6px;
+  border-bottom: 1px solid var(--border); padding-bottom: 6px;
+}
 
 .ach-clear-counter {
   text-align: center; font-size: 0.88rem; color: var(--primary);

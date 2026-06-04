@@ -51,6 +51,7 @@
     <section id="view-cards" class="view active">
       <div class="card-counter">
         <span id="card-index">1</span> / <span id="card-total">10</span>
+        <button id="self-study-btn" class="self-study-btn-inline">＋自主學習</button>
       </div>
       <div id="card-container" class="card-container"></div>
       <div class="card-nav">
@@ -59,7 +60,6 @@
         <button id="next-card">下一個</button>
       </div>
       <button id="mark-done" class="mark-done-btn">標記今日已完成</button>
-      <button id="self-study-btn" class="self-study-btn">自主學習 +10 字</button>
     </section>
 
     <!-- 測驗頁 -->
@@ -286,12 +286,18 @@
       <div id="achievement-milestone-list"></div>
     </section>
 
-    <!-- 武器庫頁 -->
+    <!-- 裝備庫頁 -->
     <section id="view-weapon" class="view">
+      <h3 class="equip-section-header">⚔️ 武器</h3>
       <div class="weapon-page-header">
-        <div class="weapon-equipped-row">目前裝備：<span id="weapon-equipped-display">無</span></div>
+        <div class="weapon-equipped-row">裝備中：<span id="weapon-equipped-display">無</span></div>
       </div>
       <div id="weapon-inventory" class="weapon-inventory"></div>
+      <h3 class="equip-section-header">🛡️ 防具</h3>
+      <div class="weapon-page-header">
+        <div class="weapon-equipped-row">裝備中：<span id="armor-equipped-display">無</span></div>
+      </div>
+      <div id="armor-inventory" class="weapon-inventory"></div>
     </section>
   </main>
 
@@ -333,7 +339,7 @@
       <span class="nav-icon">⚔️</span><span>角色</span>
     </button>
     <button class="nav-btn" data-view="weapon">
-      <span class="nav-icon">🗡️</span><span>武器庫</span>
+      <span class="nav-icon">🗡️</span><span>裝備庫</span>
     </button>
     <button class="nav-btn" data-view="shop">
       <span class="nav-icon">🏪</span><span>商店</span>
