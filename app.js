@@ -1143,9 +1143,10 @@ function initBattle() {
   battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: getEquippedArmorType() === "paradise_cape" ? getArmorLevel() : 0, sorcererBuff: false };
 
   if (state.quiz?.range === "learned") {
-    battleState.lmBoss = { hp: 500, maxHp: 500 };
+    const savedHp = progress.lmBossHp ?? 500;
+    battleState.lmBoss = { hp: savedHp, maxHp: 500 };
     battleState.lmPhase = "boss";
-    battleState.hp = 500;
+    battleState.hp = savedHp;
     battleState.monsterMaxHp = 500;
   }
 
@@ -1483,6 +1484,8 @@ function handleLearnedMonsterDeath(monsterEl) {
   onMonsterKilled();
   setTimeout(() => {
     // BOSS 被打倒 → 重置
+    progress.lmBossHp = 500;
+    saveProgress(progress);
     battleState.lmBoss = { hp: 500, maxHp: 500 };
     battleState.lmPhase = "boss";
     battleState.hp = 500;
@@ -1570,6 +1573,8 @@ function triggerAttack(isCritical) {
     battleState.hp -= dmg;
     if (state.quiz?.range === "learned") {
       battleState.lmBoss.hp = Math.max(0, battleState.hp);
+      progress.lmBossHp = battleState.lmBoss.hp;
+      saveProgress(progress);
     }
     updateMonsterHP();
     showDamageNumber(dmg, isCritical, wt.color);
