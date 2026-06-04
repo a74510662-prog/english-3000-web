@@ -654,10 +654,7 @@ function answerQuestion(btn, isCorrect, q) {
     }
     fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
     fb.className = "quiz-feedback no";
-    if (state.quiz.range === "learned") {
-      // 小怪攻擊（ATK3），BOSS 爆擊延遲在下方統一處理
-      if (battleState.lmPhase === "smalls") triggerMonsterAttack(3);
-    } else {
+    if (state.quiz.range !== "learned") {
       triggerMonsterAttack(state.quiz.range === "all" ? getDragonDamage() : undefined);
     }
     // 迴旋鏢：答錯返回打擊（隨等級增加傷害）
@@ -716,27 +713,24 @@ function answerQuestion(btn, isCorrect, q) {
       setTimeout(() => {
         if (battleState.playerHp <= 0) { if (isLastQ) document.getElementById("next-question").classList.remove("hidden"); return; }
         if (!gameEl || gameEl.classList.contains("hidden")) return;
-        showBattleEffect("🐉 BOSS 攻擊 -4", "#e74c3c");
+        showBattleEffect("🐉 BOSS 攻擊 -3", "#e74c3c");
         setTimeout(() => {
           if (battleState.playerHp <= 0) return;
           if (!gameEl || gameEl.classList.contains("hidden")) return;
-          triggerMonsterAttack(4);
+          triggerMonsterAttack(3);
           if (isLastQ) setTimeout(() => { if (battleState.playerHp > 0) document.getElementById("next-question").classList.remove("hidden"); }, 1900);
         }, 600);
       }, 1000);
     } else {
-      // 答錯：小怪 ATK1（如在小怪階段）+ BOSS 爆擊 ATK4
-      // 小怪攻擊已在上方 triggerMonsterAttack(1) 觸發（答錯判斷區）
-      // BOSS 爆擊延遲觸發
       if (isLastQ) document.getElementById("next-question").classList.add("hidden");
       setTimeout(() => {
         if (battleState.playerHp <= 0) { if (isLastQ) document.getElementById("next-question").classList.remove("hidden"); return; }
         if (!gameEl || gameEl.classList.contains("hidden")) return;
-        showBattleEffect("🐉 BOSS 爆擊 -6！", "#e74c3c");
+        showBattleEffect("🐉 BOSS 爆擊 -5！", "#e74c3c");
         setTimeout(() => {
           if (battleState.playerHp <= 0) return;
           if (!gameEl || gameEl.classList.contains("hidden")) return;
-          triggerMonsterAttack(6);
+          triggerMonsterAttack(5);
           if (isLastQ) setTimeout(() => { if (battleState.playerHp > 0) document.getElementById("next-question").classList.remove("hidden"); }, 1900);
         }, 600);
       }, 1200);
@@ -1149,16 +1143,14 @@ function initBattle() {
   battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: getEquippedArmorType() === "paradise_cape" ? getArmorLevel() : 0, sorcererBuff: false };
 
   if (state.quiz?.range === "learned") {
-    battleState.lmSmalls = Array(5).fill(null).map(() => ({ hp: 3, maxHp: 3, alive: true }));
-    battleState.lmBoss = { hp: 20, maxHp: 20 };
-    battleState.lmSmallIdx = 0;
-    battleState.lmPhase = "smalls";
-    battleState.hp = 3;
-    battleState.monsterMaxHp = 3;
+    battleState.lmBoss = { hp: 500, maxHp: 500 };
+    battleState.lmPhase = "boss";
+    battleState.hp = 500;
+    battleState.monsterMaxHp = 500;
   }
 
   const mChar = document.getElementById("monster-char");
-  if (mChar) { mChar.textContent = state.quiz?.range === "all" ? "🐉" : MONSTERS[0]; mChar.className = "battle-char"; }
+  if (mChar) { mChar.textContent = (state.quiz?.range === "all" || state.quiz?.range === "learned") ? "🐉" : MONSTERS[0]; mChar.className = "battle-char"; }
   const pChar = document.getElementById("player-char");
   if (pChar) { pChar.textContent = progress.char?.avatar || "🧙"; pChar.className = "battle-char"; }
   updateMonsterHP();
@@ -1177,15 +1169,11 @@ function updateLearnedBattleDisplay() {
   }
   if (state.quiz?.range !== "learned") { el.style.display = "none"; return; }
   el.style.display = "block";
-  const smalls = battleState.lmSmalls || [];
-  const bossHp = battleState.lmBoss?.hp ?? 20;
-  const bossMax = battleState.lmBoss?.maxHp ?? 20;
+  const bossHp = battleState.lmBoss?.hp ?? 500;
+  const bossMax = battleState.lmBoss?.maxHp ?? 500;
   const bossPct = Math.max(0, (bossHp / bossMax) * 100);
-  const smallIcons = smalls.map(s => s.alive ? "🦇" : "💀").join(" ");
-  const bossActive = battleState.lmPhase === "boss";
   el.innerHTML = `
-    <div class="lm-smalls-row">小怪：${smallIcons}</div>
-    <div class="lm-boss-row${bossActive ? " lm-boss-active" : ""}">
+    <div class="lm-boss-row lm-boss-active">
       🐉 BOSS <span class="lm-boss-hp">${bossHp}/${bossMax}HP</span>
       <div class="lm-boss-bar-bg"><div class="lm-boss-bar-fill" style="width:${bossPct.toFixed(1)}%"></div></div>
     </div>`;
@@ -1492,40 +1480,16 @@ function handleMonsterDeath(monsterEl) {
 function handleLearnedMonsterDeath(monsterEl) {
   monsterEl.classList.add("dying");
   playMonsterDeathSfx();
-  onMonsterKilled(); // gives coins
+  onMonsterKilled();
   setTimeout(() => {
-    if (battleState.lmPhase === "smalls") {
-      battleState.lmSmalls[battleState.lmSmallIdx].alive = false;
-      // 找下一隻活著的小怪
-      let nextIdx = -1;
-      for (let i = 0; i < 5; i++) {
-        if (battleState.lmSmalls[i].alive) { nextIdx = i; break; }
-      }
-      if (nextIdx >= 0) {
-        battleState.lmSmallIdx = nextIdx;
-        battleState.hp = battleState.lmSmalls[nextIdx].hp;
-        battleState.monsterMaxHp = battleState.lmSmalls[nextIdx].maxHp;
-        monsterEl.textContent = MONSTERS[(nextIdx + 1) % MONSTERS.length];
-      } else {
-        // 所有小怪已死 → 切換到 BOSS 階段
-        battleState.lmPhase = "boss";
-        battleState.hp = battleState.lmBoss.hp;
-        battleState.monsterMaxHp = battleState.lmBoss.maxHp;
-        monsterEl.textContent = "🐉";
-        showBattleEffect("⚔️ BOSS 登場！", "#e74c3c");
-      }
-    } else {
-      // BOSS 被打倒 → 重置整場（重新生成）
-      battleState.lmSmalls = Array(5).fill(null).map(() => ({ hp: 3, maxHp: 3, alive: true }));
-      battleState.lmBoss = { hp: 20, maxHp: 20 };
-      battleState.lmSmallIdx = 0;
-      battleState.lmPhase = "smalls";
-      battleState.hp = 3;
-      battleState.monsterMaxHp = 3;
-      monsterEl.textContent = MONSTERS[0];
-      showBattleEffect("🏆 BOSS 討伐！💰+10", "#ffd700");
-      addCoins(10);
-    }
+    // BOSS 被打倒 → 重置
+    battleState.lmBoss = { hp: 500, maxHp: 500 };
+    battleState.lmPhase = "boss";
+    battleState.hp = 500;
+    battleState.monsterMaxHp = 500;
+    monsterEl.textContent = "🐉";
+    showBattleEffect("🏆 BOSS 討伐！💰+10", "#ffd700");
+    addCoins(10);
     monsterEl.className = "battle-char appearing";
     updateMonsterHP();
     updateLearnedBattleDisplay();
@@ -1605,8 +1569,7 @@ function triggerAttack(isCritical) {
     monsterEl.classList.add("hit");
     battleState.hp -= dmg;
     if (state.quiz?.range === "learned") {
-      if (battleState.lmPhase === "boss") battleState.lmBoss.hp = Math.max(0, battleState.hp);
-      else if (battleState.lmSmalls?.[battleState.lmSmallIdx]) battleState.lmSmalls[battleState.lmSmallIdx].hp = Math.max(0, battleState.hp);
+      battleState.lmBoss.hp = Math.max(0, battleState.hp);
     }
     updateMonsterHP();
     showDamageNumber(dmg, isCritical, wt.color);
