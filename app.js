@@ -351,6 +351,7 @@ function renderCard() {
     });
   }
 
+  updateMarkAllBtn();
 }
 
 function toggleLearned(id) {
@@ -363,6 +364,29 @@ function toggleLearned(id) {
   renderCard();
 }
 
+function markAllTodayLearned() {
+  const targets = state.originalTodayWords || state.todayWords.slice(0, 10);
+  if (!targets.length) return;
+  const alreadyAll = targets.every(w => progress.learnedIds.includes(w.id));
+  if (alreadyAll) { alert("今日 10 字已全部標記為熟記。"); return; }
+  if (!confirm(`將今日 ${targets.length} 個單字全部標記為熟記？`)) return;
+  targets.forEach(w => {
+    if (!progress.learnedIds.includes(w.id)) progress.learnedIds.push(w.id);
+  });
+  saveProgress(progress);
+  renderCard();
+  const btn = document.getElementById("mark-all-today");
+  if (btn) { btn.textContent = "✓ 已全部熟記"; btn.disabled = true; }
+}
+
+function updateMarkAllBtn() {
+  const btn = document.getElementById("mark-all-today");
+  if (!btn) return;
+  const targets = state.originalTodayWords || state.todayWords.slice(0, 10);
+  const alreadyAll = targets.length > 0 && targets.every(w => progress.learnedIds.includes(w.id));
+  btn.textContent = alreadyAll ? "✓ 已全部熟記" : "✓ 今日10字全部熟記";
+  btn.disabled = alreadyAll;
+}
 
 function updateStreak() {
   const today = todayDateString();
@@ -2657,8 +2681,7 @@ document.getElementById("back-to-today").addEventListener("click", () => {
   document.getElementById("defeat-restart").addEventListener("click", resetQuizSetup);
 
   document.getElementById("word-search").addEventListener("input", e => searchWords(e.target.value));
-  document.getElementById("reset-progress").addEventListener("click", resetAllProgress);
-
+  document.getElementById("mark-all-today").addEventListener("click", markAllTodayLearned);
   document.querySelectorAll(".chest-qty-btn").forEach(btn => {
     btn.addEventListener("click", () => openChests(parseInt(btn.dataset.count, 10)));
   });
