@@ -1006,6 +1006,15 @@ const STAGE_WEAPON_POOLS = [
   ["dark", "holy"],              // 8: 50HP
 ];
 
+// null = 商店購買（彩虹券），數字 = 需熟記單字數
+const WEAPON_UNLOCK_WORDS = {
+  dagger: 0, bow: 0, staff: 0,
+  boomerang: 300, hammer: 600, trident: 900,
+  fire: 1200, ice: 1200, thunder: 1500,
+  dark: 1800, holy: 2400,
+  dragon_sword: null,
+};
+
 function getWeaponTypeData(key) {
   return WEAPON_TYPES.find(w => w.key === key) || WEAPON_TYPES[0];
 }
@@ -2327,6 +2336,7 @@ function renderWeaponInventory() {
   if (!container) return;
   const inv = (progress.char && progress.char.weaponInventory) ? progress.char.weaponInventory : [];
   const equipped = (progress.char && progress.char.equippedWeapon) || null;
+  const learnedCount = (progress.learnedIds || []).length;
 
   // 更新頁首已裝備顯示
   const equippedDisplay = document.getElementById("weapon-equipped-display");
@@ -2341,44 +2351,61 @@ function renderWeaponInventory() {
     }
   }
 
-  if (inv.length === 0) {
-    container.innerHTML = '<div class="weapon-empty">尚無武器，開寶箱獲得</div>';
-    return;
-  }
   container.innerHTML = "";
-  inv.forEach(w => {
-    const wt = getWeaponTypeData(w.type);
-    const isEquipped = w.type === equipped;
-    const lvTag = w.level > 0 ? ` <span class="weapon-lv-tag">Lv.${w.level}</span>` : "";
+  WEAPON_TYPES.forEach(wt => {
+    const w = inv.find(x => x.type === wt.key);
+    const isEquipped = wt.key === equipped;
     const div = document.createElement("div");
-    div.className = "weapon-item" + (isEquipped ? " equipped" : "");
-    div.innerHTML = `
-      <div class="weapon-item-icon">${wt.emoji}</div>
-      <div class="weapon-item-info">
-        <div class="weapon-item-name">${wt.name} +${w.attack}${lvTag}</div>
-        <div class="weapon-item-sub">${wt.key === "dragon_sword" ? `傳說武器・不可升階・基礎攻擊 ${w.attack}` : `升級進度 ${w.count}/5・實際傷害 +${w.attack + (w.level || 0)}`}</div>
-        <div class="weapon-item-special">${getWeaponSpecialDesc(wt, w)}</div>
-      </div>
-      <div class="weapon-item-action">
-        ${isEquipped
-          ? '<span class="weapon-badge">裝備中</span>'
-          : `<button class="weapon-equip-btn" data-type="${w.type}">裝備</button>`}
-      </div>`;
-    if (!isEquipped) {
-      div.querySelector(".weapon-equip-btn").addEventListener("click", () => {
-        progress.char.equippedWeapon = w.type;
-        saveProgress(progress);
-        renderWeaponInventory();
-        // 同步更新角色頁武器顯示（若已開啟）
-        const charWeapon = document.getElementById("char-weapon");
-        if (charWeapon) {
-          const item = getEquippedWeaponItem();
-          if (item) {
-            const wd = getWeaponTypeData(item.type);
-            charWeapon.textContent = `${wd.emoji} ${wd.name}${item.level > 0 ? ` Lv.${item.level}` : ""} (+${getPlayerAttack() - 1})`;
+
+    if (w) {
+      // 已擁有
+      const lvTag = w.level > 0 ? ` <span class="weapon-lv-tag">Lv.${w.level}</span>` : "";
+      div.className = "weapon-item" + (isEquipped ? " equipped" : "");
+      div.innerHTML = `
+        <div class="weapon-item-icon">${wt.emoji}</div>
+        <div class="weapon-item-info">
+          <div class="weapon-item-name">${wt.name} +${w.attack}${lvTag}</div>
+          <div class="weapon-item-sub">${wt.key === "dragon_sword" ? `傳說武器・不可升階・基礎攻擊 ${w.attack}` : `升級進度 ${w.count}/5・實際傷害 +${w.attack + (w.level || 0)}`}</div>
+          <div class="weapon-item-special">${getWeaponSpecialDesc(wt, w)}</div>
+        </div>
+        <div class="weapon-item-action">
+          ${isEquipped
+            ? '<span class="weapon-badge">裝備中</span>'
+            : `<button class="weapon-equip-btn" data-type="${wt.key}">裝備</button>`}
+        </div>`;
+      if (!isEquipped) {
+        div.querySelector(".weapon-equip-btn").addEventListener("click", () => {
+          progress.char.equippedWeapon = wt.key;
+          saveProgress(progress);
+          renderWeaponInventory();
+          const charWeapon = document.getElementById("char-weapon");
+          if (charWeapon) {
+            const item = getEquippedWeaponItem();
+            if (item) {
+              const wd = getWeaponTypeData(item.type);
+              charWeapon.textContent = `${wd.emoji} ${wd.name}${item.level > 0 ? ` Lv.${item.level}` : ""} (+${getPlayerAttack() - 1})`;
+            }
           }
-        }
-      });
+        });
+      }
+    } else {
+      // 未擁有：鎖定顯示
+      const req = WEAPON_UNLOCK_WORDS[wt.key];
+      const unlockHint = req === null
+        ? "商店・🌈 彩虹券 ×1"
+        : req === 0
+          ? "開寶箱取得"
+          : learnedCount >= req
+            ? `熟記已達 ${req} 字・開寶箱取得`
+            : `熟記 ${req} 字解鎖（還差 ${req - learnedCount} 字）`;
+      div.className = "weapon-item weapon-item-locked";
+      div.innerHTML = `
+        <div class="weapon-item-icon" style="opacity:0.35">🔒</div>
+        <div class="weapon-item-info">
+          <div class="weapon-item-name" style="color:var(--text-light)">${wt.name}</div>
+          <div class="weapon-item-sub">${unlockHint}</div>
+          <div class="weapon-item-special" style="opacity:0.5">${wt.special}</div>
+        </div>`;
     }
     container.appendChild(div);
   });

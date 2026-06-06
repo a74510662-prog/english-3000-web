@@ -821,6 +821,7 @@ body {
 .weapon-lv-tag { color: var(--accent); font-size: 0.78rem; font-weight: 700; }
 .weapon-item-action { flex-shrink: 0; }
 .weapon-badge { font-size: 0.72rem; color: var(--accent); font-weight: 700; }
+.weapon-item-locked { opacity: 0.45; background: #f0f0f0; filter: grayscale(60%); pointer-events: none; }
 .weapon-equip-btn {
   font-size: 0.75rem; padding: 4px 10px;
   background: var(--primary); color: #fff;
