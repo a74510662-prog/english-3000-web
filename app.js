@@ -207,14 +207,25 @@ function switchView(view) {
 // === 今日 10 字 ===
 function loadTodayWords() {
   state.viewDate = todayDateString();
-  const seed = dateSeed(state.viewDate) + progress.shuffleOffset + userNameSeed(currentUser);
-  const unlearned = wordsPool.filter(w => !progress.learnedIds.includes(w.id));
-  const pool = unlearned.length >= 10 ? unlearned : wordsPool;
-  const base = seededShuffle(pool, seed).slice(0, 10);
+  ensureDailyTasks();
+
+  let base;
+  const savedIds = progress.dailyTasks.todayWordIds;
+  if (savedIds && savedIds.length >= 10) {
+    // 同一天已鎖定的 10 字，直接復原（避免熟記後 reload 換字）
+    const idOrder = savedIds;
+    base = idOrder.map(id => wordsPool.find(w => w.id === id)).filter(Boolean);
+    if (base.length < 10) base = _generateTodayBase(); // 保險：找不到時重新生成
+  } else {
+    base = _generateTodayBase();
+    progress.dailyTasks.todayWordIds = base.map(w => w.id);
+    saveProgress(progress);
+  }
+
   state.todayWords = [...base];
   state.originalTodayWords = [...base];
+
   // 還原今日自主學習字（頁面重整後仍可瀏覽）
-  ensureDailyTasks();
   const pendingIds = new Set(progress.dailyTasks.selfStudyPendingIds || []);
   if (pendingIds.size > 0) {
     const baseIds = new Set(base.map(w => w.id));
@@ -223,6 +234,13 @@ function loadTodayWords() {
   }
   state.currentCard = 0;
   state.flipped = false;
+}
+
+function _generateTodayBase() {
+  const seed = dateSeed(todayDateString()) + progress.shuffleOffset + userNameSeed(currentUser);
+  const unlearned = wordsPool.filter(w => !progress.learnedIds.includes(w.id));
+  const pool = unlearned.length >= 10 ? unlearned : wordsPool;
+  return seededShuffle(pool, seed).slice(0, 10);
 }
 
 function selfStudyAdd() {
@@ -286,6 +304,7 @@ function updateSelfStudyQuizBtn() {
 
 function reshuffleToday() {
   progress.shuffleOffset = (progress.shuffleOffset + 1) % 100000;
+  if (progress.dailyTasks) progress.dailyTasks.todayWordIds = [];
   saveProgress(progress);
   loadTodayWords();
   renderCard();
@@ -2031,7 +2050,7 @@ function buyItem(item, cost) {
 function ensureDailyTasks() {
   const today = todayDateString();
   if (!progress.dailyTasks || progress.dailyTasks.date !== today) {
-    progress.dailyTasks = { date: today, enToZhDone: false, zhToEnDone: false, monstersKilled: 0, challengeDone: false, bonusKillsEnToZh: 0, bonusKillsZhToEn: 0, dailyCoinTotal: 0, perfectCoinEnToZh: false, perfectCoinZhToEn: false, selfStudyAdded: 0, selfStudyPendingIds: [], selfStudyEnToZhDone: false, selfStudyZhToEnDone: false };
+    progress.dailyTasks = { date: today, enToZhDone: false, zhToEnDone: false, monstersKilled: 0, challengeDone: false, bonusKillsEnToZh: 0, bonusKillsZhToEn: 0, dailyCoinTotal: 0, perfectCoinEnToZh: false, perfectCoinZhToEn: false, selfStudyAdded: 0, selfStudyPendingIds: [], selfStudyEnToZhDone: false, selfStudyZhToEnDone: false, todayWordIds: [] };
     saveProgress(progress);
   } else {
     if (progress.dailyTasks.monstersKilled === undefined) progress.dailyTasks.monstersKilled = 0;
