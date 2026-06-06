@@ -1016,8 +1016,8 @@ function getCriticalMs() {
 
 // 動態數值（依進度/角色等級）
 function getMonsterStage() {
-  const days = progress.completedDates ? progress.completedDates.length : 0;
-  return Math.min(8, Math.floor(days / 31.25));
+  const learned = (progress.learnedIds || []).length;
+  return Math.min(8, Math.floor(learned / 300));
 }
 function getLearnedMonsterTier() {
   const learned = Math.min((progress.learnedIds || []).length, 3000);
