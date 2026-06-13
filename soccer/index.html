@@ -42,24 +42,30 @@ const DP2 = { cx: 702, cy: 436 };
 const DP_HALF = 50, DS = 32, DG = 3;
 const AB1 = { x: 207, y: 416, w: 66, h: 36 };
 const AB2 = { x: 527, y: 416, w: 66, h: 36 };
+const PAUSE_BTN = { x: GW - 36, y: 5, w: 30, h: 24 };
 
 // ── Characters ──────────────────────────────────────────
-// 速度調慢：speed 降低，kick 降低，衝刺速度從 22 降到 15
 const CHARS = [
   { name:'速度型', icon:'⚡', color:'#e74c3c',
-    speed:3.8, kick:6, desc:['移動速度最快','絕招：閃電衝刺'],
+    speed:3.8, kick:6,
+    desc:['移動速度最快','閃電衝刺'],
+    specialFull:'能量滿時觸發，瞬間朝移動方向高速衝刺，撞球威力大增',
     special(p){ const d=Math.hypot(p.vx,p.vy)||1; p.vx=p.vx/d*15; p.vy=p.vy/d*15; p.dashFr=16; } },
   { name:'力量型', icon:'💪', color:'#e67e22',
-    speed:2.8, kick:10, desc:['踢球力道最強','絕招：火焰射門'],
+    speed:2.8, kick:10,
+    desc:['踢球力道最強','火焰射門'],
+    specialFull:'能量滿時觸發，下一次碰球踢力翻倍，球帶火焰效果飛出',
     special(p){ p.powerShot=true; } },
   { name:'技巧型', icon:'🌀', color:'#2ecc71',
-    speed:3.3, kick:7, desc:['控球範圍最大','絕招：香蕉球'],
+    speed:3.3, kick:7,
+    desc:['控球範圍最大','香蕉弧線球'],
+    specialFull:'能量滿時觸發，下一次踢球產生側旋弧線，球路自動拐彎',
     special(p){ p.curveShot=true; } },
 ];
 
 // ── State ───────────────────────────────────────────────
-let mode='1v1', c1=0, c2=1, aiDiff='medium';
-// scene: 'menu' | 'diffsel' | 'csel' | 'play' | 'goal' | 'gameover'
+let mode='1v1', c1=0, c2=1, aiDiff='medium', pausedFrom='';
+// scene: 'menu'|'diffsel'|'csel'|'play'|'goal'|'pause'|'gameover'
 let scene='menu', cselStep=0;
 let players=[], ball;
 let scores=[0,0], timer=120;
@@ -146,29 +152,21 @@ function updP(p) {
   p.y=Math.max(p.r+FT,Math.min(FB-p.r,p.y));
 
   // P1: F鍵  P2: 數字鍵Enter（NumpadEnter）
-  const actKey = ti===0
-    ? (keys['KeyF']||tc.a)
-    : (keys['NumpadEnter']||tc.a);
+  const actKey = ti===0 ? (keys['KeyF']||tc.a) : (keys['NumpadEnter']||tc.a);
   if(actKey&&!acPr[ti]&&p.energy>=100){ acPr[ti]=true; p.energy=0; CHARS[p.ci].special(p); }
   if(!actKey) acPr[ti]=false;
 }
 
-// AI 依難度調整
 function updAI(p) {
-  const spdMult  = { easy:0.48, medium:0.78, hard:1.0  }[aiDiff];
-  const chaseRange = { easy:75,  medium:160,  hard:260  }[aiDiff];
-  const leadFrames = { easy:0,   medium:0,    hard:10   }[aiDiff];
-
+  const spdMult   = { easy:0.48, medium:0.78, hard:1.0  }[aiDiff];
+  const chaseRange= { easy:75,   medium:160,  hard:260  }[aiDiff];
+  const leadFr    = { easy:0,    medium:0,    hard:10   }[aiDiff];
   const eGoalX=p.team===1?GW:0;
   const onOurHalf=p.team===1?ball.x<GW/2:ball.x>GW/2;
   let tx,ty;
   if(Math.hypot(ball.x-p.x,ball.y-p.y)<chaseRange||onOurHalf){
-    tx=ball.x+ball.vx*leadFrames+(eGoalX>GW/2?14:-14);
-    ty=ball.y+ball.vy*leadFrames;
-  } else {
-    tx=GW/2+(p.team===1?-90:90); ty=FMY;
-  }
-
+    tx=ball.x+ball.vx*leadFr+(eGoalX>GW/2?14:-14); ty=ball.y+ball.vy*leadFr;
+  } else { tx=GW/2+(p.team===1?-90:90); ty=FMY; }
   const dx=tx-p.x,dy=ty-p.y,d=Math.sqrt(dx*dx+dy*dy);
   if(d>5){ p.vx=(dx/d)*p.speed*spdMult; p.vy=(dy/d)*p.speed*spdMult; }
   else{ p.vx*=0.8; p.vy*=0.8; }
@@ -178,7 +176,6 @@ function updAI(p) {
   p.energy=Math.min(100,p.energy+0.06);
 }
 
-// 球速調慢：摩擦加大 0.987→0.975，速度上限 19→13
 function updBall() {
   ball.vx*=0.975; ball.vy*=0.975;
   if(ball.curveFr>0){ ball.vx+=ball.curveSign*ball.curveFr; ball.curveFr*=0.93; }
@@ -279,7 +276,6 @@ function drawHUD() {
   const fl=timer<30?0.5+0.5*Math.sin(Date.now()/200):1;
   ctx.fillStyle=timer<30?`rgba(255,80,80,${fl})`:'rgba(255,255,255,0.8)';
   ctx.font='bold 15px Arial'; ctx.fillText(`${m}:${s.toString().padStart(2,'0')}`,GW/2,17);
-  // AI難度標示（2v2時顯示）
   if(mode==='2v2'){
     const dLabel={easy:'簡單',medium:'中等',hard:'困難'}[aiDiff];
     const dColor={easy:'#2ecc71',medium:'#f39c12',hard:'#e74c3c'}[aiDiff];
@@ -290,6 +286,13 @@ function drawHUD() {
   ctx.fillText(`${CHARS[c1].icon} ${CHARS[c1].name}`,8,20);
   ctx.fillStyle=CHARS[c2].color; ctx.textAlign='right';
   ctx.fillText(`${CHARS[c2].name} ${CHARS[c2].icon}`,GW-8,20);
+  // 暫停按鈕
+  ctx.fillStyle='rgba(255,255,255,0.15)';
+  rr(PAUSE_BTN.x,PAUSE_BTN.y,PAUSE_BTN.w,PAUSE_BTN.h,5); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+  rr(PAUSE_BTN.x,PAUSE_BTN.y,PAUSE_BTN.w,PAUSE_BTN.h,5); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='14px Arial'; ctx.textAlign='center';
+  ctx.fillText('⏸',PAUSE_BTN.x+PAUSE_BTN.w/2,PAUSE_BTN.y+PAUSE_BTN.h*0.78);
 }
 
 function drawCtrl() {
@@ -333,6 +336,50 @@ function drawActBtn(btn,p,active,color){
     ctx.fillStyle=full?'#f1c40f':'#2ecc71';
     ctx.fillRect(btn.x,btn.y+btn.h+2,btn.w*p.energy/100,3);
   }
+}
+
+// ── Pause screen ──────────────────────────────────────────
+const PAUSE_BW=360, PAUSE_BH=262;
+const PAUSE_BX=GW/2-PAUSE_BW/2, PAUSE_BY=GH/2-PAUSE_BH/2;
+
+function drawPause(){
+  ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(0,0,GW,GH);
+  ctx.fillStyle='rgba(12,12,32,0.97)';
+  rr(PAUSE_BX,PAUSE_BY,PAUSE_BW,PAUSE_BH,14); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=2;
+  rr(PAUSE_BX,PAUSE_BY,PAUSE_BW,PAUSE_BH,14); ctx.stroke();
+
+  // Title
+  ctx.fillStyle='#fff'; ctx.font='bold 22px Arial'; ctx.textAlign='center';
+  ctx.fillText('⏸ 暫停',GW/2,PAUSE_BY+38);
+
+  // 絕招說明區塊
+  const sx=PAUSE_BX+14, sy=PAUSE_BY+50, sw=PAUSE_BW-28, sh=74;
+  ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(sx,sy,sw,sh);
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1; ctx.strokeRect(sx,sy,sw,sh);
+
+  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='bold 10px Arial'; ctx.textAlign='left';
+  ctx.fillText('⚡ 絕招說明（能量條滿後按絕招鈕觸發）',sx+8,sy+14);
+
+  const ch1=CHARS[c1], ch2=CHARS[c2];
+  // P1
+  ctx.fillStyle=ch1.color; ctx.font='bold 12px Arial';
+  ctx.fillText(`P1 ${ch1.icon} ${ch1.name}：${ch1.desc[1]}`,sx+8,sy+32);
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='10px Arial';
+  ctx.fillText(ch1.specialFull,sx+8,sy+46);
+  // P2
+  ctx.fillStyle=ch2.color; ctx.font='bold 12px Arial';
+  ctx.fillText(`P2 ${ch2.icon} ${ch2.name}：${ch2.desc[1]}`,sx+8,sy+60);
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='10px Arial';
+  ctx.fillText(ch2.specialFull,sx+8,sy+74);
+
+  // Buttons
+  mBtn(GW/2-95,PAUSE_BY+136,190,46,'▶  繼續遊戲','#27ae60');
+  mBtn(GW/2-95,PAUSE_BY+194,190,46,'🏠 返回主選單','#e74c3c');
+
+  // ESC hint
+  ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='11px Arial'; ctx.textAlign='center';
+  ctx.fillText('Esc 繼續',GW/2,PAUSE_BY+PAUSE_BH-10);
 }
 
 function drawGoalFx(){
@@ -393,14 +440,13 @@ function mBtn(x,y,w,h,lbl,col){
 }
 
 // ── AI Difficulty Select ─────────────────────────────────
-const DIFFS = [
-  { key:'easy',   label:'😊 簡單', desc:'AI反應慢、速度慢',     color:'#27ae60' },
-  { key:'medium', label:'😐 中等', desc:'均衡難度',             color:'#f39c12' },
-  { key:'hard',   label:'😈 困難', desc:'AI快速且預判球路',     color:'#e74c3c' },
+const DIFFS=[
+  {key:'easy',  label:'😊 簡單',desc:'AI反應慢、速度慢',    color:'#27ae60'},
+  {key:'medium',label:'😐 中等',desc:'均衡難度',            color:'#f39c12'},
+  {key:'hard',  label:'😈 困難',desc:'AI快速且預判球路',    color:'#e74c3c'},
 ];
 const DIFF_BW=170,DIFF_BH=95,DIFF_GAP=22;
-const DIFF_TOTAL=3*DIFF_BW+2*DIFF_GAP;
-const DIFF_SX=(GW-DIFF_TOTAL)/2;
+const DIFF_SX=(GW-(3*DIFF_BW+2*DIFF_GAP))/2;
 const DIFF_BY=170;
 
 function drawDiffsel(){
@@ -412,8 +458,7 @@ function drawDiffsel(){
   ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='14px Arial';
   ctx.fillText('難度影響 AI 隊友與對手的速度和反應',GW/2,108);
   DIFFS.forEach((d,i)=>{
-    const bx=DIFF_SX+i*(DIFF_BW+DIFF_GAP), by=DIFF_BY;
-    const sel=aiDiff===d.key;
+    const bx=DIFF_SX+i*(DIFF_BW+DIFF_GAP),by=DIFF_BY,sel=aiDiff===d.key;
     ctx.fillStyle=sel?d.color:'rgba(255,255,255,0.07)';
     rr(bx,by,DIFF_BW,DIFF_BH,12); ctx.fill();
     ctx.strokeStyle=sel?'#fff':'rgba(255,255,255,0.2)';
@@ -422,10 +467,7 @@ function drawDiffsel(){
     ctx.fillText(d.label,bx+DIFF_BW/2,by+38);
     ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='12px Arial';
     ctx.fillText(d.desc,bx+DIFF_BW/2,by+60);
-    if(sel){
-      ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 11px Arial';
-      ctx.fillText('▶ 已選',bx+DIFF_BW/2,by+80);
-    }
+    if(sel){ ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 11px Arial'; ctx.fillText('▶ 已選',bx+DIFF_BW/2,by+80); }
   });
   mBtn(GW/2-75,GH-70,150,46,'確認 ✓','#27ae60');
 }
@@ -433,57 +475,82 @@ function drawDiffsel(){
 // ── Character Select ────────────────────────────────────
 function drawCsel(){
   ctx.fillStyle='#1a1a2e'; ctx.fillRect(0,0,GW,GH);
-  const team=cselStep, col=team===1?CHARS[c1].color:CHARS[c2].color;
+  const team=cselStep,col=team===1?CHARS[c1].color:CHARS[c2].color;
   ctx.fillStyle=col; ctx.font='bold 24px Arial'; ctx.textAlign='center';
   ctx.fillText(`玩家${team} 選擇角色`,GW/2,44);
   ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='13px Arial';
   ctx.fillText('點選角色卡選擇',GW/2,64);
-  const cw=180,ch=195,gap=18,total=3*cw+2*gap,sx=(GW-total)/2;
+  const cw=180,ch=205,gap=18,total=3*cw+2*gap,sx=(GW-total)/2;
   CHARS.forEach((ch2,i)=>{
-    const cx2=sx+i*(cw+gap), cy2=GH/2-ch/2+15;
-    const sel=(team===1?c1:c2)===i;
+    const cx2=sx+i*(cw+gap),cy2=GH/2-ch/2+10,sel=(team===1?c1:c2)===i;
     ctx.fillStyle=sel?ch2.color:'rgba(255,255,255,0.07)';
     rr(cx2,cy2,cw,ch,12); ctx.fill();
     ctx.strokeStyle=sel?'#fff':'rgba(255,255,255,0.18)';
     ctx.lineWidth=sel?3:1; rr(cx2,cy2,cw,ch,12); ctx.stroke();
+    // Icon
     ctx.font=`${cw*0.28}px Arial`; ctx.textAlign='center'; ctx.fillStyle='#fff';
-    ctx.fillText(ch2.icon,cx2+cw/2,cy2+58);
-    ctx.font='bold 15px Arial'; ctx.fillText(ch2.name,cx2+cw/2,cy2+86);
+    ctx.fillText(ch2.icon,cx2+cw/2,cy2+56);
+    // Name
+    ctx.font='bold 15px Arial'; ctx.fillText(ch2.name,cx2+cw/2,cy2+82);
+    // Stats
     ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Arial';
-    ch2.desc.forEach((d,di)=>ctx.fillText(d,cx2+cw/2,cy2+105+di*17));
+    ctx.fillText(ch2.desc[0],cx2+cw/2,cy2+100);
+    // Special name
+    ctx.fillStyle=sel?'#fff':'rgba(255,255,255,0.8)'; ctx.font='bold 12px Arial';
+    ctx.fillText(`絕招：${ch2.desc[1]}`,cx2+cw/2,cy2+120);
+    // Special description
+    ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='9.5px Arial';
+    // Word wrap simple: split at 14 chars
+    const words=ch2.specialFull, half=Math.ceil(words.length/2);
+    const line1=words.slice(0,half), line2=words.slice(half);
+    ctx.fillText(line1,cx2+cw/2,cy2+138);
+    ctx.fillText(line2,cx2+cw/2,cy2+152);
   });
-  mBtn(GW/2-75,GH-62,150,44,'確認 ✓','#27ae60');
+  mBtn(GW/2-75,GH-58,150,44,'確認 ✓','#27ae60');
 }
 
 // ── Tap / Click handler ──────────────────────────────────
+function inPauseBtn(gx,gy){
+  return gx>=PAUSE_BTN.x&&gx<=PAUSE_BTN.x+PAUSE_BTN.w&&gy>=PAUSE_BTN.y&&gy<=PAUSE_BTN.y+PAUSE_BTN.h;
+}
+
 function handleTap(gx,gy){
   function inR(x,y,w,h){return gx>=x&&gx<=x+w&&gy>=y&&gy<=y+h;}
-  if(scene==='menu'){
+  if(scene==='play'||scene==='goal'){
+    if(inPauseBtn(gx,gy)){ pausedFrom=scene; scene='pause'; }
+  } else if(scene==='menu'){
     if(inR(GW/2-115,185,230,52)){ mode='1v1'; cselStep=1; scene='csel'; }
     if(inR(GW/2-115,257,230,52)){ mode='2v2'; scene='diffsel'; }
   } else if(scene==='diffsel'){
-    DIFFS.forEach((d,i)=>{
-      if(inR(DIFF_SX+i*(DIFF_BW+DIFF_GAP),DIFF_BY,DIFF_BW,DIFF_BH)) aiDiff=d.key;
-    });
+    DIFFS.forEach((d,i)=>{ if(inR(DIFF_SX+i*(DIFF_BW+DIFF_GAP),DIFF_BY,DIFF_BW,DIFF_BH)) aiDiff=d.key; });
     if(inR(GW/2-75,GH-70,150,46)){ cselStep=1; scene='csel'; }
   } else if(scene==='csel'){
-    const cw=180,ch=195,gap=18,total=3*cw+2*gap,sx=(GW-total)/2;
+    const cw=180,ch=205,gap=18,total=3*cw+2*gap,sx=(GW-total)/2;
     CHARS.forEach((_,i)=>{
-      const cx2=sx+i*(cw+gap),cy2=GH/2-ch/2+15;
+      const cx2=sx+i*(cw+gap),cy2=GH/2-ch/2+10;
       if(inR(cx2,cy2,cw,ch)){ if(cselStep===1)c1=i; else c2=i; }
     });
-    if(inR(GW/2-75,GH-62,150,44)){ if(cselStep===1)cselStep=2; else initPlay(); }
+    if(inR(GW/2-75,GH-58,150,44)){ if(cselStep===1)cselStep=2; else initPlay(); }
+  } else if(scene==='pause'){
+    if(inR(GW/2-95,PAUSE_BY+136,190,46)) scene=pausedFrom; // 繼續
+    if(inR(GW/2-95,PAUSE_BY+194,190,46)) scene='menu';     // 返回主選單
   } else if(scene==='gameover'){
     if(!canRst) canRst=true; else scene='menu';
   }
 }
-cv.addEventListener('click', e=>{const g=c2g(e.clientX,e.clientY);handleTap(g.x,g.y);});
+
+cv.addEventListener('click', e=>{
+  const g=c2g(e.clientX,e.clientY); handleTap(g.x,g.y);
+});
 cv.addEventListener('touchstart', e=>{
-  if(scene!=='play'&&scene!=='goal'){
-    const t=e.touches[0]; const g=c2g(t.clientX,t.clientY); handleTap(g.x,g.y);
-  }
+  const t=e.touches[0]; const g=c2g(t.clientX,t.clientY); handleTap(g.x,g.y);
 },{passive:false});
+
 document.addEventListener('keydown', e=>{
+  if(e.code==='Escape'){
+    if(scene==='play'||scene==='goal'){ pausedFrom=scene; scene='pause'; }
+    else if(scene==='pause') scene=pausedFrom;
+  }
   if(e.code==='Enter'&&scene==='gameover'){ if(!canRst)canRst=true; else scene='menu'; }
 });
 
@@ -493,31 +560,25 @@ function loop(ts){
   const dt=Math.min(ts-last,50); last=ts;
   ctx.clearRect(0,0,GW,GH);
 
-  if(scene==='menu')      { drawMenu(); }
-  else if(scene==='diffsel') { drawDiffsel(); }
-  else if(scene==='csel') { drawCsel(); }
+  if(scene==='menu')        { drawMenu(); }
+  else if(scene==='diffsel'){ drawDiffsel(); }
+  else if(scene==='csel')   { drawCsel(); }
   else if(scene==='play'||scene==='goal'){
     if(scene==='play'){
       timer-=dt/1000;
       if(timer<=0){ timer=0; scene='gameover'; canRst=false; }
-      players.forEach(updP);
-      updBall();
-      players.forEach(collideP);
+      players.forEach(updP); updBall(); players.forEach(collideP);
       const g=checkGoal();
       if(g){ scores[g-1]++; goalTeam=g; goalSt=2200; scene='goal'; }
-    } else {
-      goalSt-=dt;
-      if(goalSt<=0){ resetPos(); scene='play'; }
-    }
-    drawField();
-    players.forEach(drawPlayer);
-    drawBall();
-    drawHUD();
-    drawCtrl();
+    } else { goalSt-=dt; if(goalSt<=0){ resetPos(); scene='play'; } }
+    drawField(); players.forEach(drawPlayer); drawBall(); drawHUD(); drawCtrl();
     if(scene==='goal') drawGoalFx();
+  } else if(scene==='pause'){
+    // 凍結遊戲畫面，顯示暫停選單
+    drawField(); players.forEach(drawPlayer); drawBall(); drawHUD(); drawCtrl();
+    drawPause();
   } else if(scene==='gameover'){
-    drawField(); players.forEach(drawPlayer); drawBall();
-    drawHUD(); drawCtrl(); drawGO();
+    drawField(); players.forEach(drawPlayer); drawBall(); drawHUD(); drawCtrl(); drawGO();
   }
   requestAnimationFrame(loop);
 }
