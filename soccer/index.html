@@ -43,14 +43,14 @@ const GD = 20;                    // 球門深度（向外）
 // 控制層（浮動在場地底部角落）
 const CY = 405;                   // 控制區起始 y
 
-// D-pad（放大，分置兩側角落）
-const DP1 = { cx: 128, cy: 468 };
-const DP2 = { cx: 772, cy: 468 };
+// D-pad（兩側皆「左手D-pad / 右手絕招」）
+const DP1 = { cx: 108, cy: 468 };
+const DP2 = { cx: 718, cy: 468 };
 const DP_HALF = 56, DS = 44, DG = 5;
 
-// 絕招按鈕（D-pad 向內側）
-const AB1 = { x: 275, y: 448, w: 88, h: 46 };
-const AB2 = { x: 537, y: 448, w: 88, h: 46 };
+// 絕招按鈕（D-pad 右側，兩邊同方向：左移右絕）
+const AB1 = { x: 200, y: 450, w: 84, h: 44 };
+const AB2 = { x: 806, y: 450, w: 84, h: 44 };
 
 // 暫停按鈕（右上角 HUD 內）
 const PAUSE_BTN = { x: GW - 38, y: 7, w: 32, h: 26 };
@@ -317,23 +317,23 @@ function drawCtrl() {
   g1.addColorStop(0.5,'rgba(180,40,40,0.28)');
   g1.addColorStop(1,'rgba(180,40,40,0.45)');
   ctx.fillStyle=g1;
-  ctx.fillRect(0,CY,370,GH-CY);
+  ctx.fillRect(0,CY,300,GH-CY);
 
-  // P2 右側漸層底色（藍色調）
+  // P2 右側漸層底色（藍色調，對稱放右半段）
   const g2=ctx.createLinearGradient(0,CY,0,GH);
   g2.addColorStop(0,'rgba(30,80,180,0)');
   g2.addColorStop(0.5,'rgba(30,80,180,0.28)');
   g2.addColorStop(1,'rgba(30,80,180,0.45)');
   ctx.fillStyle=g2;
-  ctx.fillRect(GW-370,CY,370,GH-CY);
+  ctx.fillRect(GW-300,CY,300,GH-CY);
 
-  // P1 / P2 標示
-  ctx.font='bold 13px Arial'; ctx.textAlign='left';
+  // P1 / P2 標示（左→右皆為「D-pad→絕招」，方向一致）
+  ctx.font='bold 12px Arial'; ctx.textAlign='left';
   ctx.fillStyle='rgba(255,120,120,0.7)';
-  ctx.fillText('P1  WASD + F絕招',8,CY+16);
+  ctx.fillText('P1  WASD ← D-pad  |  F → 絕招',8,CY+16);
   ctx.textAlign='right';
   ctx.fillStyle='rgba(120,160,255,0.7)';
-  ctx.fillText('數字Enter絕招 + ↑←↓→  P2',GW-8,CY+16);
+  ctx.fillText('↑←↓→ ← D-pad  |  數字Enter → 絕招  P2',GW-8,CY+16);
 
   // D-pads & 按鈕
   const p1h=players.find(p=>p.team===1&&!p.ai);
