@@ -1,4 +1,4 @@
-const CACHE = "english3000-v41";
+const CACHE = "english3000-v42";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,7 +6,8 @@ const ASSETS = [
   "./app.js",
   "./words.js",
   "./manifest.json",
-  "./icon.svg"
+  "./icon.svg",
+  "./images/strawberry.png"
 ];
 
 self.addEventListener("install", e => {
