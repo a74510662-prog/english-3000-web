@@ -938,7 +938,16 @@ function resetAllProgress() {
 }
 
 // === 戰鬥系統 ===
-const MONSTERS = ["👹", "🐉", "💀", "🧟", "👾", "🦇", "🐺", "🧌", "🦂", "👻"];
+const MONSTERS = [{img: "images/strawberry.png"}, "🐉", "💀", "🧟", "👾", "🦇", "🐺", "🧌", "🦂", "👻"];
+
+function setMonsterChar(el, monster) {
+  if (typeof monster === "string") {
+    el.innerHTML = "";
+    el.textContent = monster;
+  } else if (monster && monster.img) {
+    el.innerHTML = `<img src="${monster.img}" class="monster-img" alt="怪物">`;
+  }
+}
 const AVATARS = ["🧙","🧝","🦸","🧜","🧚","🧞","🦊","🐱","🐶","🐼","🦁","🐯","🐸","🐧","🐺","🦅"];
 const ARMORS = [
   { key: "paradise_cape", name: "樂園披風", emoji: "🌸", desc: "單場次抵禦怪物攻擊一次" },
@@ -1203,7 +1212,7 @@ function initBattle() {
   }
 
   const mChar = document.getElementById("monster-char");
-  if (mChar) { mChar.textContent = (state.quiz?.range === "all" || state.quiz?.range === "learned") ? "🐉" : MONSTERS[0]; mChar.className = "battle-char"; }
+  if (mChar) { mChar.className = "battle-char"; setMonsterChar(mChar, (state.quiz?.range === "all" || state.quiz?.range === "learned") ? "🐉" : MONSTERS[0]); }
   const pChar = document.getElementById("player-char");
   if (pChar) { pChar.textContent = progress.char?.avatar || "🧙"; pChar.className = "battle-char"; }
   updateMonsterHP();
@@ -1523,7 +1532,7 @@ function handleMonsterDeath(monsterEl) {
     const newMHp = getMonsterMaxHp();
     battleState.monsterMaxHp = newMHp;
     battleState.hp = newMHp;
-    monsterEl.textContent = state.quiz?.range === "all" ? "🐉" : MONSTERS[battleState.monsterIdx];
+    setMonsterChar(monsterEl, state.quiz?.range === "all" ? "🐉" : MONSTERS[battleState.monsterIdx]);
     monsterEl.className = "battle-char appearing";
     updateMonsterHP();
     setTimeout(() => monsterEl.classList.remove("appearing"), 500);
@@ -1542,7 +1551,7 @@ function handleLearnedMonsterDeath(monsterEl) {
     battleState.lmPhase = "boss";
     battleState.hp = 500;
     battleState.monsterMaxHp = 500;
-    monsterEl.textContent = "🐉";
+    setMonsterChar(monsterEl, "🐉");
     showBattleEffect("🏆 BOSS 討伐！💰+20", "#ffd700");
     addCoins(20);
     monsterEl.className = "battle-char appearing";
