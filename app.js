@@ -59,6 +59,7 @@ function selectUser(name) {
   renderCard();
   updateSelfStudyBtnState();
   updateSelfStudyQuizBtn();
+  renderBossCard();
   const activeView = document.querySelector(".view.active");
   if (activeView) {
     const viewName = activeView.id.replace("view-", "");
@@ -126,6 +127,9 @@ function loadProgress() {
     if (!p.weakWordCounts) p.weakWordCounts = {};
     if (!p.wishes) p.wishes = ["", "", "", "", ""];
     if (!p.wishesClaimed) p.wishesClaimed = [false, false, false, false, false];
+    if (p.char.universalFragments === undefined) p.char.universalFragments = 0;
+    if (p.char.transmutationFragments === undefined) p.char.transmutationFragments = 0;
+    if (p.lastBossFight === undefined) p.lastBossFight = "";
     // 重新計算 HP（新級距：每 12 級 +1，舊為每 5 級 +1）
     p.char.maxHp = 3 + Math.floor((p.char.level || 1) / 12);
     if (!p.dailyTasks) p.dailyTasks = { date: "", enToZhDone: false, zhToEnDone: false };
@@ -144,7 +148,7 @@ function newProgress() {
     quizCorrect: 0,
     quizWrong: 0,
     shuffleOffset: 0,
-    char: { level: 1, exp: 0, maxHp: 3, equippedWeapon: null, weaponInventory: [], potions: 0, chests: 0, coins: 0, rainbowTickets: 0, avatar: "🧙", milestonesClaimed: {}, welcomeRewardClaimed: false },
+    char: { level: 1, exp: 0, maxHp: 3, equippedWeapon: null, weaponInventory: [], potions: 0, chests: 0, coins: 0, rainbowTickets: 0, avatar: "🧙", milestonesClaimed: {}, welcomeRewardClaimed: false, universalFragments: 0, transmutationFragments: 0 },
     wishes: ["", "", "", "", ""],
     wishesClaimed: [false, false, false, false, false],
     dailyTasks: { date: "", enToZhDone: false, zhToEnDone: false },
@@ -194,10 +198,10 @@ function switchView(view) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.getElementById(`view-${view}`).classList.add("active");
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-  const titles = { cards: "今日單字", quiz: "隨堂測驗", progress: "學習進度", char: "角色道具", weapon: "裝備庫", shop: "商店", achievement: "成就" };
+  const titles = { cards: "今日單字", quiz: "隨堂測驗", progress: "學習進度", char: "角色道具", weapon: "裝備庫", shop: "商店", achievement: "成就", boss: "菁英 BOSS 挑戰測驗" };
   document.getElementById("page-title").textContent = titles[view] || view;
   if (view === "progress") renderProgress();
-  if (view === "quiz") resetQuizSetup();
+  if (view === "quiz") { resetQuizSetup(); renderBossCard(); }
   if (view === "char") renderCharPanel();
   if (view === "weapon") { renderWeaponInventory(); renderArmorInventory(); }
   if (view === "shop") renderShop();
@@ -1023,23 +1027,19 @@ const WEAPON_TYPES = [
 ];
 
 const STAGE_WEAPON_POOLS = [
-  ["dagger", "bow", "staff"],   // 0: 10HP 三種基礎武器
-  ["boomerang"],                 // 1: 15HP
-  ["hammer"],                    // 2: 20HP
-  ["trident"],                   // 3: 25HP
-  ["fire", "ice"],               // 4: 30HP
-  ["ice", "thunder"],            // 5: 35HP
-  ["thunder", "dark"],           // 6: 40HP
-  ["dark", "thunder"],           // 7: 45HP
-  ["dark", "holy"],              // 8: 50HP
+  ["dagger", "bow", "staff"],         // stage 0: 0字
+  ["boomerang", "hammer", "trident"], // stage 1: 300字
+  ["fire", "ice", "thunder"],         // stage 2: 600字
+  ["dark", "holy"],                   // stage 3: 900字
 ];
+const WEAPON_STAGE_ATK = [1, 3, 5, 7];
 
 // null = 商店購買（彩虹券），數字 = 需熟記單字數
 const WEAPON_UNLOCK_WORDS = {
   dagger: 0, bow: 0, staff: 0,
-  boomerang: 300, hammer: 600, trident: 900,
-  fire: 1200, ice: 1200, thunder: 1500,
-  dark: 1800, holy: 2400,
+  boomerang: 300, hammer: 300, trident: 300,
+  fire: 600, ice: 600, thunder: 600,
+  dark: 900, holy: 900,
   dragon_sword: null,
 };
 
@@ -1055,6 +1055,35 @@ function getCriticalMs() {
 function getMonsterStage() {
   const learned = (progress.learnedIds || []).length;
   return Math.min(8, Math.floor(learned / 300));
+}
+function getWeaponStage() {
+  const learned = (progress.learnedIds || []).length;
+  if (learned >= 900) return 3;
+  if (learned >= 600) return 2;
+  if (learned >= 300) return 1;
+  return 0;
+}
+function getUnlockedWeaponTypes() {
+  const learned = (progress.learnedIds || []).length;
+  const types = [];
+  for (const [key, req] of Object.entries(WEAPON_UNLOCK_WORDS)) {
+    if (key === "dragon_sword") continue;
+    if (req !== null && learned >= req) types.push(key);
+  }
+  return types;
+}
+function allUnlockedWeaponsMaxed() {
+  const inv = progress.char?.weaponInventory || [];
+  const unlocked = getUnlockedWeaponTypes();
+  return unlocked.every(key => {
+    const w = inv.find(x => x.type === key);
+    return w && (w.level || 0) >= 10;
+  });
+}
+function addUniversalFragment() {
+  ensureChar();
+  progress.char.universalFragments = (progress.char.universalFragments || 0) + 1;
+  saveProgress(progress);
 }
 function getLearnedMonsterTier() {
   const learned = Math.min((progress.learnedIds || []).length, 3000);
@@ -1746,6 +1775,9 @@ function ensureChar() {
   if (progress.char.equippedArmor === undefined) progress.char.equippedArmor = null;
   if (progress.char.classes === undefined) progress.char.classes = {};
   if (progress.char.equippedClass === undefined) progress.char.equippedClass = null;
+  if (progress.char.universalFragments === undefined) progress.char.universalFragments = 0;
+  if (progress.char.transmutationFragments === undefined) progress.char.transmutationFragments = 0;
+  if (progress.lastBossFight === undefined) progress.lastBossFight = "";
 }
 
 function addCoins(amount) {
@@ -1769,12 +1801,25 @@ function checkDailyLogin() {
 
 function giveLevelUpWeapons() {
   ensureChar();
-  const stage = getMonsterStage();
-  const pool = STAGE_WEAPON_POOLS[stage] || ["dagger"];
-  const typeKey = pool[Math.floor(Math.random() * pool.length)];
-  const wt = getWeaponTypeData(typeKey);
-  const atk = Math.max(1, stage);
   const inv = progress.char.weaponInventory || [];
+
+  // 若當前已解鎖的武器全部滿等 → 給通用武器碎片
+  if (allUnlockedWeaponsMaxed()) {
+    addUniversalFragment();
+    progress.char.weaponInventory = inv;
+    saveProgress(progress);
+    showChestModal("🔧", `升級獎勵！所有武器已滿等<br>獲得 🔧 通用武器碎片 ×1`);
+    return;
+  }
+
+  const wStage = getWeaponStage();
+  const pool = STAGE_WEAPON_POOLS[wStage] || ["dagger"];
+  const atk = WEAPON_STAGE_ATK[wStage] || 1;
+  // 優先選尚未滿等的武器
+  const unmaxed = pool.filter(k => { const w = inv.find(x => x.type === k); return !w || (w.level || 0) < 10; });
+  const pickPool = unmaxed.length > 0 ? unmaxed : pool;
+  const typeKey = pickPool[Math.floor(Math.random() * pickPool.length)];
+  const wt = getWeaponTypeData(typeKey);
   let upgradeText = "";
   for (let i = 0; i < 2; i++) {
     const existing = inv.find(x => x.type === typeKey);
@@ -2016,37 +2061,48 @@ function buyItem(item, cost) {
     renderShop();
     alert(`購買成功！🧪 HP 藥水 ×1（目前 ${progress.char.potions} 瓶）`);
   } else if (item === "weapon") {
-    const stage = getMonsterStage();
-    const pool = STAGE_WEAPON_POOLS[stage] || ["dagger"];
-    const typeKey = pool[Math.floor(Math.random() * pool.length)];
-    const wt = getWeaponTypeData(typeKey);
-    const atk = Math.max(1, stage);
     const inv = progress.char.weaponInventory || [];
-    const existing = inv.find(x => x.type === typeKey);
-    let upgradeText = "";
-    if (existing) {
-      existing.attack = Math.max(existing.attack, atk);
-      if ((existing.level || 0) >= 10) {
-        upgradeText = `<br>（${wt.name} 已達最高等級 Lv.10）`;
-      } else {
-        existing.count = (existing.count || 0) + 1;
-        if (existing.count >= 5) {
-          existing.count -= 5;
-          existing.level = (existing.level || 0) + 1;
-          upgradeText = existing.level >= 10
-            ? `<br>🏆 ${wt.name} 達到最高等級 Lv.10！`
-            : `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
-        }
-      }
+    if (allUnlockedWeaponsMaxed()) {
+      progress.char.universalFragments = (progress.char.universalFragments || 0) + 1;
+      progress.char.weaponInventory = inv;
+      saveProgress(progress);
+      updateCoinsDisplay();
+      renderShop();
+      showChestModal("🔧", `所有武器已滿等<br>獲得 🔧 通用武器碎片 ×1（共 ${progress.char.universalFragments}）`);
     } else {
-      inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
-      if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
+      const wStage = getWeaponStage();
+      const atk = WEAPON_STAGE_ATK[wStage] || 1;
+      const pool = STAGE_WEAPON_POOLS[wStage] || ["dagger"];
+      const unmaxed = pool.filter(k => { const w = inv.find(x => x.type === k); return !w || (w.level || 0) < 10; });
+      const pickPool = unmaxed.length > 0 ? unmaxed : pool;
+      const typeKey = pickPool[Math.floor(Math.random() * pickPool.length)];
+      const wt = getWeaponTypeData(typeKey);
+      const existing = inv.find(x => x.type === typeKey);
+      let upgradeText = "";
+      if (existing) {
+        existing.attack = Math.max(existing.attack, atk);
+        if ((existing.level || 0) >= 10) {
+          upgradeText = `<br>（${wt.name} 已達最高等級 Lv.10）`;
+        } else {
+          existing.count = (existing.count || 0) + 1;
+          if (existing.count >= 5) {
+            existing.count -= 5;
+            existing.level = (existing.level || 0) + 1;
+            upgradeText = existing.level >= 10
+              ? `<br>🏆 ${wt.name} 達到最高等級 Lv.10！`
+              : `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
+          }
+        }
+      } else {
+        inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
+        if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
+      }
+      progress.char.weaponInventory = inv;
+      saveProgress(progress);
+      updateCoinsDisplay();
+      renderShop();
+      showChestModal(wt.emoji, `${wt.name} 碎片 ×1${upgradeText}`);
     }
-    progress.char.weaponInventory = inv;
-    saveProgress(progress);
-    updateCoinsDisplay();
-    renderShop();
-    showChestModal(wt.emoji, `${wt.name} 碎片 ×1${upgradeText}`);
   } else if (item === "exp") {
     saveProgress(progress);
     const leveled = addExp(1);
@@ -2141,33 +2197,41 @@ function _rollOneChest() {
     emoji = "🧪";
     summary = "藥水+1";
   } else if (roll < 0.90) {
-    const stage = getMonsterStage();
-    const atk = Math.max(1, stage);
-    const pool = STAGE_WEAPON_POOLS[stage] || ["dagger"];
-    const typeKey = pool[Math.floor(Math.random() * pool.length)];
-    const wt = getWeaponTypeData(typeKey);
-    emoji = wt.emoji;
     const inv = progress.char.weaponInventory || [];
-    const existing = inv.find(x => x.type === typeKey);
-    if (existing) {
-      existing.attack = Math.max(existing.attack, atk);
-      if ((existing.level || 0) < 10) {
-        existing.count = (existing.count || 0) + 1;
-        if (existing.count >= 5) {
-          existing.count -= 5;
-          existing.level = (existing.level || 0) + 1;
-          emoji = existing.level >= 10 ? "🏆" : "🆙";
-          summary = existing.level >= 10 ? `${wt.name}達Lv.10!` : `${wt.name}升Lv.${existing.level}`;
+    if (allUnlockedWeaponsMaxed()) {
+      progress.char.universalFragments = (progress.char.universalFragments || 0) + 1;
+      emoji = "🔧";
+      summary = `通用武器碎片×1(共${progress.char.universalFragments})`;
+    } else {
+      const wStage = getWeaponStage();
+      const atk = WEAPON_STAGE_ATK[wStage] || 1;
+      const pool = STAGE_WEAPON_POOLS[wStage] || ["dagger"];
+      const unmaxed = pool.filter(k => { const w = inv.find(x => x.type === k); return !w || (w.level || 0) < 10; });
+      const pickPool = unmaxed.length > 0 ? unmaxed : pool;
+      const typeKey = pickPool[Math.floor(Math.random() * pickPool.length)];
+      const wt = getWeaponTypeData(typeKey);
+      emoji = wt.emoji;
+      const existing = inv.find(x => x.type === typeKey);
+      if (existing) {
+        existing.attack = Math.max(existing.attack, atk);
+        if ((existing.level || 0) < 10) {
+          existing.count = (existing.count || 0) + 1;
+          if (existing.count >= 5) {
+            existing.count -= 5;
+            existing.level = (existing.level || 0) + 1;
+            emoji = existing.level >= 10 ? "🏆" : "🆙";
+            summary = existing.level >= 10 ? `${wt.name}達Lv.10!` : `${wt.name}升Lv.${existing.level}`;
+          } else {
+            summary = `${wt.name}碎片${existing.count}/5`;
+          }
         } else {
-          summary = `${wt.name}碎片${existing.count}/5`;
+          summary = `${wt.name}(已滿級)`;
         }
       } else {
-        summary = `${wt.name}(已滿級)`;
+        inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
+        if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
+        summary = `獲得${wt.name}!`;
       }
-    } else {
-      inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
-      if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
-      summary = `獲得${wt.name}!`;
     }
     progress.char.weaponInventory = inv;
   } else {
@@ -2548,6 +2612,8 @@ function renderCharPanel() {
   set("inv-potions", c.potions);
   set("inv-chests", c.chests);
   set("inv-rainbow", c.rainbowTickets || 0);
+  set("inv-universal-fragments", c.universalFragments || 0);
+  set("inv-transmutation-fragments", `${c.transmutationFragments || 0}/24`);
   set("task-en-zh-status", dt.enToZhDone ? "✅" : "⬜");
   set("task-zh-en-status", dt.zhToEnDone ? "✅" : "⬜");
   set("task-challenge-status", dt.challengeDone ? "✅" : "⬜");
@@ -2767,3 +2833,244 @@ document.getElementById("back-to-today").addEventListener("click", () => {
     });
   });
 });
+
+// === BOSS 挑戰系統 ===
+const BOSS_TIERS = [
+  { minWords: 1500, hp: 305, atk: 10 },
+  { minWords: 1200, hp: 290, atk: 9  },
+  { minWords: 900,  hp: 255, atk: 8  },
+  { minWords: 600,  hp: 190, atk: 7  },
+  { minWords: 300,  hp: 120, atk: 5  },
+];
+const BOSS_TRANSMUTATION_REQUIRED = 24;
+
+let bossState = null;
+
+function getCurrentBossTier() {
+  const learned = (progress.learnedIds || []).length;
+  for (const tier of BOSS_TIERS) {
+    if (learned >= tier.minWords) return tier;
+  }
+  return null;
+}
+
+function getWeekString() {
+  const d = new Date();
+  const jan1 = new Date(d.getFullYear(), 0, 1);
+  const week = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+  return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function canFightBossThisWeek() {
+  ensureChar();
+  const last = progress.lastBossFight || "";
+  return last !== getWeekString();
+}
+
+function renderBossCard() {
+  const card = document.getElementById("boss-challenge-card");
+  if (!card) return;
+  const tier = getCurrentBossTier();
+  if (!tier) {
+    card.innerHTML = `<div class="boss-card-locked">
+      <span class="boss-card-lock-icon">🔒</span>
+      <div class="boss-card-lock-text">菁英 BOSS 挑戰測驗<br><span>熟記 300 字後解鎖</span></div>
+    </div>`;
+    return;
+  }
+  const frags = (progress.char && progress.char.transmutationFragments) || 0;
+  const canFight = canFightBossThisWeek();
+  const learned = (progress.learnedIds || []).length;
+  const weekStr = getWeekString();
+  card.innerHTML = `
+    <div class="boss-card-header">⚔️ 菁英 BOSS 挑戰測驗</div>
+    <div class="boss-card-info">
+      <span class="boss-card-tier">Tier: 熟記 ${tier.minWords}+ 字｜HP ${tier.hp}｜攻 ${tier.atk}</span>
+    </div>
+    <div class="boss-card-frags">
+      🔮 幻化碎片：${frags} / ${BOSS_TRANSMUTATION_REQUIRED}
+      <div class="boss-frag-bar-bg"><div class="boss-frag-bar-fill" style="width:${Math.min(100,(frags/BOSS_TRANSMUTATION_REQUIRED)*100).toFixed(1)}%"></div></div>
+    </div>
+    <div class="boss-card-week">${canFight ? "✅ 本週可挑戰" : "⏳ 本週已挑戰（下週重置）"}</div>
+    <button class="boss-fight-btn" ${canFight ? "" : "disabled"} onclick="startBossBattle()">
+      ${canFight ? "⚔️ 開始挑戰" : "已挑戰"}
+    </button>`;
+}
+
+function getBossWeakWordPool() {
+  const learned = progress.learnedIds || [];
+  const weak = progress.weakWordIds || [];
+  const weakSet = new Set(weak);
+  // 60% 弱點字 + 40% 一般熟記字，至少 20 題
+  const weakWords = wordsPool.filter(w => weakSet.has(w.id) && learned.includes(w.id));
+  const normalWords = wordsPool.filter(w => learned.includes(w.id) && !weakSet.has(w.id));
+  const targetWeak = Math.ceil(20 * 0.6);
+  const shuffledWeak = shuffle([...weakWords]).slice(0, targetWeak);
+  const targetNormal = 20 - shuffledWeak.length;
+  const shuffledNormal = shuffle([...normalWords]).slice(0, targetNormal);
+  return shuffle([...shuffledWeak, ...shuffledNormal]);
+}
+
+function startBossBattle() {
+  if (!canFightBossThisWeek()) return;
+  const tier = getCurrentBossTier();
+  if (!tier) return;
+  ensureChar();
+  const pool = getBossWeakWordPool();
+  if (pool.length < 4) {
+    alert("熟記字數太少，至少需要 4 個單字才能挑戰！");
+    return;
+  }
+  bossState = {
+    tier,
+    bossHp: tier.hp,
+    bossMaxHp: tier.hp,
+    playerHp: getPlayerMaxHp(),
+    playerMaxHp: getPlayerMaxHp(),
+    pool,
+    qIdx: 0,
+    correct: 0,
+    total: pool.length,
+    finished: false
+  };
+  switchView("boss");
+  renderBossBattle();
+  renderBossQuestion();
+}
+
+function renderBossBattle() {
+  const bossImg = document.getElementById("boss-monster-img");
+  if (bossImg) bossImg.src = "images/strawberry.png";
+  const playerCharEl = document.getElementById("boss-player-char");
+  if (playerCharEl) playerCharEl.textContent = progress.char?.avatar || "🧙";
+  const battleEl = document.getElementById("boss-battle-main");
+  if (battleEl) battleEl.classList.remove("hidden");
+  const resultEl = document.getElementById("boss-result");
+  if (resultEl) resultEl.classList.add("hidden");
+  updateBossHP();
+  updateBossPlayerHP();
+}
+
+function updateBossHP() {
+  if (!bossState) return;
+  const hp = Math.max(0, bossState.bossHp);
+  const pct = (hp / bossState.bossMaxHp) * 100;
+  const fill = document.getElementById("boss-hp-fill");
+  const val = document.getElementById("boss-hp-val");
+  const maxEl = document.getElementById("boss-hp-max");
+  if (fill) { fill.style.width = pct + "%"; fill.style.background = pct > 60 ? "#27ae60" : pct > 30 ? "#f39c12" : "#e74c3c"; }
+  if (val) val.textContent = hp;
+  if (maxEl) maxEl.textContent = bossState.bossMaxHp;
+}
+
+function updateBossPlayerHP() {
+  if (!bossState) return;
+  const el = document.getElementById("boss-player-hp");
+  if (el) {
+    el.textContent = `${Math.max(0, bossState.playerHp)} / ${bossState.playerMaxHp}`;
+    el.style.color = bossState.playerHp <= 1 ? "#e74c3c" : bossState.playerHp <= Math.ceil(bossState.playerMaxHp / 2) ? "#f39c12" : "#27ae60";
+  }
+}
+
+function renderBossQuestion() {
+  if (!bossState || bossState.finished) return;
+  if (bossState.qIdx >= bossState.pool.length) { finishBossBattle(bossState.bossHp <= 0); return; }
+  const q = bossState.pool[bossState.qIdx];
+  const progressEl = document.getElementById("boss-progress");
+  if (progressEl) progressEl.textContent = `題目 ${bossState.qIdx + 1} / ${bossState.total} ｜ BOSS HP: ${bossState.bossHp}`;
+  const qEl = document.getElementById("boss-question");
+  if (qEl) qEl.textContent = q.word;
+  // 4 個選項
+  const distractors = shuffle(wordsPool.filter(w => w.word !== q.word)).slice(0, 3);
+  const options = shuffle([q, ...distractors]);
+  const optEl = document.getElementById("boss-options");
+  if (!optEl) return;
+  optEl.innerHTML = "";
+  options.forEach(opt => {
+    const btn = document.createElement("button");
+    btn.className = "boss-option-btn";
+    btn.textContent = opt.meaning;
+    btn.addEventListener("click", () => answerBossQuestion(opt.id === q.id, q));
+    optEl.appendChild(btn);
+  });
+  const fb = document.getElementById("boss-feedback");
+  if (fb) { fb.textContent = ""; fb.className = "boss-feedback"; }
+  const nextBtn = document.getElementById("boss-next-btn");
+  if (nextBtn) nextBtn.classList.add("hidden");
+}
+
+function answerBossQuestion(correct, q) {
+  if (!bossState) return;
+  const optEl = document.getElementById("boss-options");
+  if (optEl) optEl.querySelectorAll(".boss-option-btn").forEach(b => b.disabled = true);
+  const fb = document.getElementById("boss-feedback");
+  const nextBtn = document.getElementById("boss-next-btn");
+  if (correct) {
+    bossState.correct++;
+    const atk = getPlayerAttack();
+    bossState.bossHp = Math.max(0, bossState.bossHp - atk);
+    updateBossHP();
+    if (fb) { fb.textContent = `✅ 正確！對 BOSS 造成 ${atk} 傷害`; fb.className = "boss-feedback boss-fb-correct"; }
+    if (bossState.bossHp <= 0) {
+      bossState.finished = true;
+      setTimeout(() => finishBossBattle(true), 800);
+      return;
+    }
+  } else {
+    bossState.bossHp = Math.min(bossState.bossMaxHp, bossState.bossHp + 3);
+    const dmg = bossState.tier.atk;
+    bossState.playerHp = Math.max(0, bossState.playerHp - dmg);
+    updateBossHP();
+    updateBossPlayerHP();
+    if (fb) { fb.textContent = `❌ 答錯！BOSS 回復 3HP，你受到 ${dmg} 傷害。正確：${q.meaning}`; fb.className = "boss-feedback boss-fb-wrong"; }
+    if (bossState.playerHp <= 0) {
+      bossState.finished = true;
+      setTimeout(() => finishBossBattle(false), 800);
+      return;
+    }
+  }
+  if (nextBtn) nextBtn.classList.remove("hidden");
+}
+
+function nextBossQuestion() {
+  if (!bossState) return;
+  bossState.qIdx++;
+  if (bossState.qIdx >= bossState.pool.length) {
+    finishBossBattle(bossState.bossHp <= 0);
+  } else {
+    renderBossQuestion();
+  }
+}
+
+function finishBossBattle(victory) {
+  if (!bossState) return;
+  bossState.finished = true;
+  ensureChar();
+  const resultEl = document.getElementById("boss-result");
+  const battleEl = document.getElementById("boss-battle-main");
+  if (battleEl) battleEl.classList.add("hidden");
+  if (!resultEl) return;
+  resultEl.classList.remove("hidden");
+
+  if (victory) {
+    // 記錄本週已挑戰
+    progress.lastBossFight = getWeekString();
+    // 給幻化碎片
+    progress.char.transmutationFragments = (progress.char.transmutationFragments || 0) + 1;
+    saveProgress(progress);
+    resultEl.innerHTML = `
+      <div class="boss-result-title boss-result-win">🎉 挑戰成功！</div>
+      <div class="boss-result-detail">答對 ${bossState.correct} / ${bossState.total} 題<br>BOSS HP 歸零！</div>
+      <div class="boss-result-reward">獲得 🔮 幻化碎片 ×1（共 ${progress.char.transmutationFragments}/${BOSS_TRANSMUTATION_REQUIRED}）</div>
+      <button class="boss-back-btn" onclick="switchView('quiz'); renderBossCard();">返回測驗頁</button>`;
+  } else {
+    progress.lastBossFight = getWeekString();
+    saveProgress(progress);
+    resultEl.innerHTML = `
+      <div class="boss-result-title boss-result-lose">💀 挑戰失敗</div>
+      <div class="boss-result-detail">答對 ${bossState.correct} / ${bossState.total} 題<br>${bossState.playerHp <= 0 ? "HP 歸零" : "題目用盡，BOSS 未被擊敗"}</div>
+      <div class="boss-result-reward">本週挑戰機會已用盡，下週再來！</div>
+      <button class="boss-back-btn" onclick="switchView('quiz'); renderBossCard();">返回測驗頁</button>`;
+  }
+  renderCharPanel();
+}

@@ -66,6 +66,7 @@
 
     <!-- 測驗頁 -->
     <section id="view-quiz" class="view">
+      <div id="boss-challenge-card" class="boss-challenge-card"></div>
       <div id="quiz-setup">
         <h2>選擇測驗模式</h2>
         <div class="quiz-mode-group">
@@ -127,6 +128,36 @@
         <div id="defeat-score" class="defeat-score"></div>
         <button id="defeat-restart">重新挑戰</button>
       </div>
+    </section>
+
+    <!-- BOSS 挑戰頁 -->
+    <section id="view-boss" class="view">
+      <div id="boss-battle-main">
+        <div class="boss-arena">
+          <div class="boss-fighter">
+            <div id="boss-player-char" class="battle-char">🧙</div>
+            <div id="boss-player-hp" class="player-hp-num">3/3</div>
+            <div class="fighter-label">學習者</div>
+          </div>
+          <div class="battle-mid"><div class="vs-banner">⚔️</div></div>
+          <div class="boss-fighter">
+            <img id="boss-monster-img" class="boss-monster-img" src="images/strawberry.png" alt="菁英 BOSS">
+            <div class="boss-hp-wrap">
+              <div class="boss-hp-bar-bg">
+                <div id="boss-hp-fill" class="boss-hp-fill"></div>
+              </div>
+              <div class="boss-hp-text">BOSS HP <span id="boss-hp-val">0</span>/<span id="boss-hp-max">0</span></div>
+            </div>
+            <div class="fighter-label">菁英 BOSS</div>
+          </div>
+        </div>
+        <div id="boss-progress" class="boss-progress"></div>
+        <div id="boss-question" class="boss-question"></div>
+        <div id="boss-options" class="boss-options"></div>
+        <div id="boss-feedback" class="boss-feedback"></div>
+        <button id="boss-next-btn" class="boss-next-btn hidden" onclick="nextBossQuestion()">下一題</button>
+      </div>
+      <div id="boss-result" class="hidden"></div>
     </section>
 
     <!-- 進度頁 -->
@@ -208,6 +239,14 @@
         <div class="inventory-row">
           <span>🌈 彩虹券</span>
           <span id="inv-rainbow">0</span>
+        </div>
+        <div class="inventory-row">
+          <span>🔧 通用武器碎片</span>
+          <span id="inv-universal-fragments">0</span>
+        </div>
+        <div class="inventory-row">
+          <span>🔮 幻化碎片</span>
+          <span id="inv-transmutation-fragments">0/24</span>
         </div>
       </div>
       <div class="char-class-card">
