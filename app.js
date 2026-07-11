@@ -1580,14 +1580,24 @@ function playDefeatSfx() {
   [523, 494, 466, 440].forEach((freq, i) => sfxOsc(ctx, 'sine', freq, freq * 0.92, 0.28, 0.22, t + i * 0.3));
 }
 
-function showDamageNumber(dmg, isCritical, color, arenaId) {
+function playBossSpecialSfx() {
+  if (_sfxMuted) return;
+  const ctx = getSfxCtx(); if (!ctx) return;
+  const t = ctx.currentTime;
+  sfxNoise(ctx, 1200, 'bandpass', 0.4, 0.3, t);
+  sfxOsc(ctx, 'sawtooth', 90, 700, 0.35, 0.3, t + 0.08);
+  sfxOsc(ctx, 'square', 500, 40, 0.3, 0.35, t + 0.35);
+  sfxNoise(ctx, 3000, 'highpass', 0.15, 0.25, t + 0.4);
+}
+
+function showDamageNumber(dmg, isCritical, color, arenaId, side) {
   const arena = document.getElementById(arenaId || "battle-arena");
   if (!arena) return;
   const el = document.createElement("div");
   el.className = "damage-number" + (isCritical ? " crit-dmg" : "");
   el.textContent = `-${dmg}`;
   el.style.color = color || "#fff";
-  el.style.left = (52 + Math.random() * 18) + "%";
+  el.style.left = (side === "left" ? 8 + Math.random() * 18 : 52 + Math.random() * 18) + "%";
   el.style.top = (22 + Math.random() * 22) + "%";
   arena.appendChild(el);
   setTimeout(() => el.remove(), 950);
@@ -1616,6 +1626,39 @@ function shakeArena(isCritical, arenaId) {
   void arena.offsetWidth;
   arena.classList.add(isCritical ? "shaking-big" : "shaking");
   setTimeout(() => arena.classList.remove("shaking", "shaking-big"), 520);
+}
+
+// 菁英BOSS 絕招：招式名稱橫幅
+function showBossSpecialBanner(name, desc) {
+  const banner = document.getElementById("boss-special-banner");
+  const nameEl = document.getElementById("boss-special-name");
+  const descEl = document.getElementById("boss-special-desc");
+  if (!banner) return;
+  if (nameEl) nameEl.textContent = name;
+  if (descEl) descEl.textContent = desc;
+  banner.classList.remove("hidden");
+  banner.classList.remove("boss-special-banner-anim");
+  void banner.offsetWidth;
+  banner.classList.add("boss-special-banner-anim");
+  setTimeout(() => banner.classList.add("hidden"), 1300);
+}
+
+// 菁英BOSS 絕招：大型飛行特效（草莓群/棒棒糖/音符 衝向學習者）
+function spawnBossSpecialParticles(emoji) {
+  const arena = document.getElementById("boss-arena");
+  if (!arena) return;
+  for (let i = 0; i < 9; i++) {
+    const el = document.createElement("div");
+    el.className = "boss-special-particle";
+    const delay = i * 60;
+    const sx = -(280 + Math.random() * 120);
+    const sy = (Math.random() - 0.5) * 140;
+    const sr = (Math.random() - 0.5) * 360;
+    el.style.cssText = `top:${25 + Math.random() * 40}%; right:${4 + Math.random() * 10}%; --sx:${sx}px; --sy:${sy}px; --sr:${sr}deg; animation-delay:${delay}ms;`;
+    el.textContent = emoji;
+    arena.appendChild(el);
+    setTimeout(() => el.remove(), 1000 + delay);
+  }
 }
 
 function extendTimer(ms) {
@@ -3006,14 +3049,29 @@ document.getElementById("back-to-today").addEventListener("click", () => {
 
 // === BOSS 挑戰系統（三連戰：可重複刷關，血量記錄到下一次挑戰）===
 const BOSS_STAGES = [
-  { label: "小BOSS 1/3",   hp: 2000, atk: 3,  img: "images/strawberry.png",    alt: "小BOSS" },
-  { label: "小BOSS 2/3",   hp: 3000, atk: 5,  img: "images/boss-monster1.png", alt: "小BOSS" },
-  { label: "菁英 BOSS 3/3", hp: 5000, atk: 10, img: "images/boss-monster2.png", alt: "菁英 BOSS" },
+  { label: "小BOSS 1/3",   hp: 2000, atk: 3,  img: "images/strawberry.png",    alt: "小BOSS",
+    special: { name: "🍓 草莓群攻", desc: "一群草莓突擊！", mult: 10, emoji: "🍓" } },
+  { label: "小BOSS 2/3",   hp: 3000, atk: 5,  img: "images/boss-monster1.png", alt: "小BOSS",
+    special: { name: "🍭 棒棒糖重擊", desc: "巨型棒棒糖猛擊！", mult: 12, emoji: "🍭" } },
+  { label: "菁英 BOSS 3/3", hp: 5000, atk: 10, img: "images/boss-monster2.png", alt: "菁英 BOSS",
+    special: { name: "🎵 音符衝擊", desc: "巨大音符突擊！", mult: 8, emoji: "🎵" } },
 ];
 const BOSS_UNLOCK_WORDS = 300;
 const BOSS_TRANSMUTATION_REQUIRED = 24;
 const BOSS_RAINBOW_FRAGMENT_REQUIRED = 10;
 const BOSS_WEEKLY_NTD_CAP = 1000;
+const BOSS_SPECIAL_INTERVAL = 500;
+const BOSS_SPECIAL_DEFEAT_HEAL = 100;
+
+// 每 500 點血量門檻累計觸發次數（用於偵測是否剛跨過新門檻）
+function getSpecialThresholdCount(maxHp, hp) {
+  return Math.floor((maxHp - Math.max(0, hp)) / BOSS_SPECIAL_INTERVAL);
+}
+
+// BOSS 掉落的新台幣隨機金額 10~100
+function getBossNtdDropAmount() {
+  return 10 + Math.floor(Math.random() * 91);
+}
 
 let bossState = null;
 
@@ -3203,6 +3261,7 @@ function answerBossQuestion(correct, q) {
   if (correct) {
     bossState.correct++;
     const atk = getPlayerAttack();
+    const prevHp = bossState.bossHp;
     bossState.bossHp = Math.max(0, bossState.bossHp - atk);
     updateBossHP();
 
@@ -3215,7 +3274,7 @@ function answerBossQuestion(correct, q) {
 
     if (bossState.bossHp <= 0 && bossState.stageIdx < BOSS_STAGES.length - 1) {
       // 小BOSS 被擊敗 → 掉新台幣（許願兌換用，非遊戲金幣），緊接著挑戰下一隻
-      const ntdRoll = 1 + Math.floor(Math.random() * 3);
+      const ntdRoll = getBossNtdDropAmount();
       const given = addBossNtd(ntdRoll);
       if (fb) { fb.textContent = `✅ 擊敗 ${stage.label}！獲得 💵NT$${given}`; fb.className = "boss-feedback boss-fb-correct"; }
       bossState.stageAdvancePending = true;
@@ -3228,6 +3287,12 @@ function answerBossQuestion(correct, q) {
       return;
     } else {
       if (fb) { fb.textContent = `✅ 正確！對 ${stage.label} 造成 ${atk} 傷害`; fb.className = "boss-feedback boss-fb-correct"; }
+      const prevCount = getSpecialThresholdCount(bossState.bossMaxHp, prevHp);
+      const newCount = getSpecialThresholdCount(bossState.bossMaxHp, bossState.bossHp);
+      if (newCount > prevCount && stage.special) {
+        setTimeout(() => triggerBossSpecialAttack(stage), 700);
+        return;
+      }
     }
   } else {
     bossState.bossHp = Math.min(bossState.bossMaxHp, bossState.bossHp + 3);
@@ -3249,6 +3314,47 @@ function answerBossQuestion(correct, q) {
     }
   }
   if (nextBtn) nextBtn.classList.remove("hidden");
+}
+
+// 菁英BOSS 絕招：血量每跨過一個 500 門檻觸發一次，造成基礎攻擊 × 倍率的重擊
+function triggerBossSpecialAttack(stage) {
+  if (!bossState) return;
+  const sp = stage.special;
+  const fb = document.getElementById("boss-feedback");
+  const nextBtn = document.getElementById("boss-next-btn");
+
+  if (fb) { fb.textContent = `⚠️ ${stage.label} 蓄力中...`; fb.className = "boss-feedback boss-fb-wrong"; }
+  showBossSpecialBanner(sp.name, sp.desc);
+  spawnBossSpecialParticles(sp.emoji);
+  shakeArena(true, "boss-arena");
+  playBossSpecialSfx();
+
+  setTimeout(() => {
+    if (!bossState) return;
+    const dmg = stage.atk * sp.mult;
+    bossState.playerHp = Math.max(0, bossState.playerHp - dmg);
+    updateBossPlayerHP();
+
+    const playerEl = document.getElementById("boss-player-char");
+    if (playerEl) {
+      playerEl.classList.remove("player-hit-big");
+      void playerEl.offsetWidth;
+      playerEl.classList.add("player-hit-big");
+    }
+    showDamageNumber(dmg, true, "#ff4757", "boss-arena", "left");
+    if (fb) { fb.textContent = `💥 ${sp.name}！你受到 ${dmg} 傷害！`; fb.className = "boss-feedback boss-fb-wrong"; }
+
+    if (bossState.playerHp <= 0) {
+      bossState.finished = true;
+      // 因絕招陣亡 → BOSS 回復血量作為懲罰
+      bossState.bossHp = Math.min(bossState.bossMaxHp, bossState.bossHp + BOSS_SPECIAL_DEFEAT_HEAL);
+      bossState.defeatedBySpecial = true;
+      updateBossHP();
+      setTimeout(() => finishBossBattle(false), 900);
+    } else {
+      if (nextBtn) nextBtn.classList.remove("hidden");
+    }
+  }, 1300);
 }
 
 function nextBossQuestion() {
@@ -3300,7 +3406,7 @@ function finishBossBattle(victory) {
       progress.char.transmutationFragments = (progress.char.transmutationFragments || 0) + 1;
       rewardLine = `獲得 🔮 幻化碎片 ×1（共 ${progress.char.transmutationFragments}/${BOSS_TRANSMUTATION_REQUIRED}）`;
     } else {
-      const given = addBossNtd(3);
+      const given = addBossNtd(getBossNtdDropAmount());
       rewardLine = given > 0 ? `獲得 💵 新台幣 NT$${given}` : `本週 BOSS 新台幣已達上限，改天再來吧！`;
     }
     progress.char.bossStageIdx = 0;
@@ -3318,10 +3424,13 @@ function finishBossBattle(victory) {
     progress.char.bossStageHp = Math.max(0, bossState.bossHp);
     saveProgress(progress);
     const stage = BOSS_STAGES[bossState.stageIdx];
+    const rewardNote = bossState.defeatedBySpecial
+      ? `因絕招陣亡，${stage.label} 回復 ${BOSS_SPECIAL_DEFEAT_HEAL} 點HP！怪物血量已記錄，下次挑戰繼續累積傷害！`
+      : "怪物血量已記錄，下次挑戰繼續累積傷害！";
     resultEl.innerHTML = `
       <div class="boss-result-title boss-result-lose">💀 挑戰結束</div>
       <div class="boss-result-detail">答對 ${bossState.correct} / ${bossState.total} 題<br>${bossState.playerHp <= 0 ? "HP 歸零" : "題目用盡"}｜${stage.label} 剩餘 HP ${Math.max(0, bossState.bossHp)}</div>
-      <div class="boss-result-reward">怪物血量已記錄，下次挑戰繼續累積傷害！</div>
+      <div class="boss-result-reward">${rewardNote}</div>
       <button class="boss-back-btn" onclick="switchView('quiz'); renderBossCard();">返回測驗頁</button>`;
   }
   renderCharPanel();
