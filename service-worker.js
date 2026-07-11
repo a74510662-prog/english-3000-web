@@ -1,4 +1,4 @@
-const CACHE = "english3000-v53";
+const CACHE = "english3000-v54";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,8 +8,8 @@ const ASSETS = [
   "./manifest.json",
   "./icon.svg",
   "./images/strawberry.png",
-  "./images/boss-monster1.jpg",
-  "./images/boss-monster2.jpg",
+  "./images/boss-monster1.png",
+  "./images/boss-monster2.png",
   "./images/learned-dragon.jpg"
 ];
 

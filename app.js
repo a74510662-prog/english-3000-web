@@ -3007,8 +3007,8 @@ document.getElementById("back-to-today").addEventListener("click", () => {
 // === BOSS 挑戰系統（三連戰：可重複刷關，血量記錄到下一次挑戰）===
 const BOSS_STAGES = [
   { label: "小BOSS 1/3",   hp: 2000, atk: 3,  img: "images/strawberry.png",    alt: "小BOSS" },
-  { label: "小BOSS 2/3",   hp: 3000, atk: 5,  img: "images/boss-monster1.jpg", alt: "小BOSS" },
-  { label: "菁英 BOSS 3/3", hp: 5000, atk: 10, img: "images/boss-monster2.jpg", alt: "菁英 BOSS" },
+  { label: "小BOSS 2/3",   hp: 3000, atk: 5,  img: "images/boss-monster1.png", alt: "小BOSS" },
+  { label: "菁英 BOSS 3/3", hp: 5000, atk: 10, img: "images/boss-monster2.png", alt: "菁英 BOSS" },
 ];
 const BOSS_UNLOCK_WORDS = 300;
 const BOSS_TRANSMUTATION_REQUIRED = 24;
