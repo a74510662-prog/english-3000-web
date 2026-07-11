@@ -127,9 +127,16 @@ function loadProgress() {
     if (!p.weakWordCounts) p.weakWordCounts = {};
     if (!p.wishes) p.wishes = ["", "", "", "", ""];
     if (!p.wishesClaimed) p.wishesClaimed = [false, false, false, false, false];
+    if (!p.wishesRedeemed) p.wishesRedeemed = [false, false, false, false, false];
+    if (!p.wishAmounts) p.wishAmounts = [0, 0, 0, 0, 0];
     if (p.char.universalFragments === undefined) p.char.universalFragments = 0;
     if (p.char.transmutationFragments === undefined) p.char.transmutationFragments = 0;
-    if (p.lastBossFight === undefined) p.lastBossFight = "";
+    if (p.char.rainbowFragments === undefined) p.char.rainbowFragments = 0;
+    if (p.char.ntd === undefined) p.char.ntd = 0;
+    if (p.char.bossNtdWeek === undefined) p.char.bossNtdWeek = "";
+    if (p.char.bossNtdEarned === undefined) p.char.bossNtdEarned = 0;
+    if (p.char.bossStageIdx === undefined) p.char.bossStageIdx = 0;
+    if (p.char.bossStageHp === undefined) p.char.bossStageHp = BOSS_STAGES[0].hp;
     // 重新計算 HP（新級距：每 12 級 +1，舊為每 5 級 +1）
     p.char.maxHp = 3 + Math.floor((p.char.level || 1) / 12);
     if (!p.dailyTasks) p.dailyTasks = { date: "", enToZhDone: false, zhToEnDone: false };
@@ -148,9 +155,11 @@ function newProgress() {
     quizCorrect: 0,
     quizWrong: 0,
     shuffleOffset: 0,
-    char: { level: 1, exp: 0, maxHp: 3, equippedWeapon: null, weaponInventory: [], potions: 0, chests: 0, coins: 0, rainbowTickets: 0, avatar: "🧙", milestonesClaimed: {}, welcomeRewardClaimed: false, universalFragments: 0, transmutationFragments: 0 },
+    char: { level: 1, exp: 0, maxHp: 3, equippedWeapon: null, weaponInventory: [], potions: 0, chests: 0, coins: 0, rainbowTickets: 0, avatar: "🧙", milestonesClaimed: {}, welcomeRewardClaimed: false, universalFragments: 0, transmutationFragments: 0, rainbowFragments: 0, ntd: 0, bossNtdWeek: "", bossNtdEarned: 0, bossStageIdx: 0, bossStageHp: 2000 },
     wishes: ["", "", "", "", ""],
     wishesClaimed: [false, false, false, false, false],
+    wishesRedeemed: [false, false, false, false, false],
+    wishAmounts: [0, 0, 0, 0, 0],
     dailyTasks: { date: "", enToZhDone: false, zhToEnDone: false },
     lastLoginDate: "",
     learnedModeClears: 0,
@@ -799,10 +808,6 @@ function nextQuestion() {
 function finishQuiz() {
   stopQuestionTimer();
   playVictorySfx();
-  if (state.quiz.range === "learned") {
-    progress.learnedModeClears = (progress.learnedModeClears || 0) + 1;
-    saveProgress(progress);
-  }
   const chestEarned = state.quiz.range === "selfStudy"
     ? checkSelfStudyChallenge(state.quiz.mode)
     : checkSessionChallenge(state.quiz.mode);
@@ -943,6 +948,7 @@ function resetAllProgress() {
 
 // === 戰鬥系統 ===
 const MONSTERS = [{img: "images/strawberry.png"}, "🐉", "💀", "🧟", "👾", "🦇", "🐺", "🧌", "🦂", "👻"];
+const LEARNED_MODE_DRAGON = { img: "images/learned-dragon.jpg" };
 
 function setMonsterChar(el, monster) {
   if (typeof monster === "string") {
@@ -1241,7 +1247,13 @@ function initBattle() {
   }
 
   const mChar = document.getElementById("monster-char");
-  if (mChar) { mChar.className = "battle-char"; setMonsterChar(mChar, (state.quiz?.range === "all" || state.quiz?.range === "learned") ? "🐉" : MONSTERS[0]); }
+  if (mChar) {
+    mChar.className = "battle-char";
+    const initialMonster = state.quiz?.range === "learned" ? LEARNED_MODE_DRAGON
+      : state.quiz?.range === "all" ? "🐉"
+      : MONSTERS[0];
+    setMonsterChar(mChar, initialMonster);
+  }
   const pChar = document.getElementById("player-char");
   if (pChar) { pChar.textContent = progress.char?.avatar || "🧙"; pChar.className = "battle-char"; }
   updateMonsterHP();
@@ -1573,14 +1585,15 @@ function handleLearnedMonsterDeath(monsterEl) {
   playMonsterDeathSfx();
   onMonsterKilled();
   setTimeout(() => {
-    // BOSS 被打倒 → 重置
+    // BOSS 被打倒 → 真正破關，累計次數＋重置血量
     progress.lmBossHp = 500;
+    progress.learnedModeClears = (progress.learnedModeClears || 0) + 1;
     saveProgress(progress);
     battleState.lmBoss = { hp: 500, maxHp: 500 };
     battleState.lmPhase = "boss";
     battleState.hp = 500;
     battleState.monsterMaxHp = 500;
-    setMonsterChar(monsterEl, "🐉");
+    setMonsterChar(monsterEl, LEARNED_MODE_DRAGON);
     showBattleEffect("🏆 BOSS 討伐！💰+20", "#ffd700");
     addCoins(20);
     monsterEl.className = "battle-char appearing";
@@ -1777,7 +1790,12 @@ function ensureChar() {
   if (progress.char.equippedClass === undefined) progress.char.equippedClass = null;
   if (progress.char.universalFragments === undefined) progress.char.universalFragments = 0;
   if (progress.char.transmutationFragments === undefined) progress.char.transmutationFragments = 0;
-  if (progress.lastBossFight === undefined) progress.lastBossFight = "";
+  if (progress.char.rainbowFragments === undefined) progress.char.rainbowFragments = 0;
+  if (progress.char.ntd === undefined) progress.char.ntd = 0;
+  if (progress.char.bossNtdWeek === undefined) progress.char.bossNtdWeek = "";
+  if (progress.char.bossNtdEarned === undefined) progress.char.bossNtdEarned = 0;
+  if (progress.char.bossStageIdx === undefined) progress.char.bossStageIdx = 0;
+  if (progress.char.bossStageHp === undefined) progress.char.bossStageHp = BOSS_STAGES[0].hp;
 }
 
 function addCoins(amount) {
@@ -1849,50 +1867,73 @@ function giveLevelUpWeapons() {
 }
 
 const WISH_REWARDS = [
-  { title: "初心英雄", badge: "🌱", cost: 50   },
-  { title: "單字勇者", badge: "⚔️", cost: 150  },
-  { title: "知識騎士", badge: "🛡️", cost: 350  },
-  { title: "語言大師", badge: "🎓", cost: 700  },
-  { title: "傳說學者", badge: "👑", cost: 1200 },
+  { title: "初心英雄", badge: "🌱", cost: 10  },
+  { title: "單字勇者", badge: "⚔️", cost: 50  },
+  { title: "知識騎士", badge: "🛡️", cost: 70  },
+  { title: "語言大師", badge: "🎓", cost: 140 },
+  { title: "傳說學者", badge: "👑", cost: 240 },
 ];
+
+const WISH_REDEEM_PASSWORD = "0426";
 
 function renderWishRewards() {
   const container = document.getElementById("shop-wish-list");
   if (!container) return;
-  const learned = (progress.learnedIds || []).length;
-  const is3000  = learned >= 3000;
   const tickets = (progress.char && progress.char.rainbowTickets) || 0;
+  const ntd = (progress.char && progress.char.ntd) || 0;
   const claimed = progress.wishesClaimed || [false, false, false, false, false];
+  const redeemed = progress.wishesRedeemed || [false, false, false, false, false];
+  const amounts = progress.wishAmounts || [0, 0, 0, 0, 0];
+  const wishTexts = progress.wishes || ["", "", "", "", ""];
   container.innerHTML = "";
-  if (!is3000) {
-    const note = document.createElement("div");
-    note.className = "shop-wish-lock-note";
-    note.textContent = `🔒 目前熟記 ${learned} / 3000 字，全部完成後解鎖`;
-    container.appendChild(note);
-  }
   WISH_REWARDS.forEach((w, i) => {
     const isClaimed  = claimed[i];
+    const isRedeemed = redeemed[i];
     const prevClaimed = i === 0 || claimed[i - 1];
-    const canRedeem  = is3000 && tickets >= w.cost && !isClaimed && prevClaimed;
-    const isSeqLocked = is3000 && !prevClaimed;
+    const canRedeem  = tickets >= w.cost && !isClaimed && prevClaimed;
+    const isSeqLocked = !prevClaimed;
     const card = document.createElement("div");
     card.className = "shop-item-card shop-wish-card" + (isClaimed ? " wish-claimed" : "");
-    card.innerHTML = `
-      <div class="shop-item-icon">${isClaimed ? w.badge : (isSeqLocked ? "🔒" : w.badge)}</div>
-      <div class="shop-item-info wish-info">
-        <div class="shop-item-name">${w.title}</div>
-        <div class="shop-wish-cost">🌈 ${w.cost} 張${isSeqLocked ? "・需先解鎖上一個稱號" : ""}</div>
-      </div>
-      <div class="shop-item-action">
-        ${isClaimed
-          ? `<span class="shop-wish-done-badge">✅ 已獲得</span>`
-          : `<button class="shop-buy-btn shop-buy-rainbow shop-wish-btn"
-               ${canRedeem ? "" : "disabled"}>兌換</button>`
-        }
-      </div>`;
+
     if (!isClaimed) {
+      // 狀態1：稱號尚未取得，用彩虹券兌換
+      card.innerHTML = `
+        <div class="shop-item-icon">${isSeqLocked ? "🔒" : w.badge}</div>
+        <div class="shop-item-info wish-info">
+          <div class="shop-item-name">${w.title}</div>
+          <div class="shop-wish-cost">🌈 ${w.cost} 張${isSeqLocked ? "・需先解鎖上一個稱號" : ""}</div>
+        </div>
+        <div class="shop-item-action">
+          <button class="shop-buy-btn shop-buy-rainbow shop-wish-btn" ${canRedeem ? "" : "disabled"}>兌換</button>
+        </div>`;
       const btn = card.querySelector(".shop-wish-btn");
       if (btn) btn.addEventListener("click", () => redeemWish(i));
+    } else if (!isRedeemed) {
+      // 狀態2：稱號已取得，這個稱號還有 1 次許願機會
+      card.innerHTML = `
+        <div class="shop-item-icon">${w.badge}</div>
+        <div class="shop-item-info wish-info" style="flex:1">
+          <div class="shop-item-name">${w.title}　<span class="shop-wish-done-badge">✅ 已獲得</span></div>
+          <div class="shop-wish-cost">💵目前 NT$${ntd}・這個稱號可以許 1 次願</div>
+          <input type="number" class="wish-redeem-input wish-amount-input" placeholder="兌換金額 NT$" min="1">
+          <input type="text" class="wish-redeem-input wish-text-input" placeholder="輸入願望內容">
+        </div>
+        <div class="shop-item-action">
+          <button class="shop-buy-btn shop-buy-rainbow shop-wish-btn">許願兌換</button>
+        </div>`;
+      const btn = card.querySelector(".shop-wish-btn");
+      if (btn) btn.addEventListener("click", () => redeemWishForTitle(i, card));
+    } else {
+      // 狀態3：這個稱號的願望已經許過了
+      card.innerHTML = `
+        <div class="shop-item-icon">${w.badge}</div>
+        <div class="shop-item-info wish-info">
+          <div class="shop-item-name">${w.title}</div>
+          <div class="shop-wish-cost">🎉 已許願：「${wishTexts[i] || ""}」・NT$${amounts[i] || 0}</div>
+        </div>
+        <div class="shop-item-action">
+          <span class="shop-wish-done-badge">✅ 已許願</span>
+        </div>`;
     }
     container.appendChild(card);
   });
@@ -1903,7 +1944,6 @@ function redeemWish(index) {
   const w       = WISH_REWARDS[index];
   const tickets = progress.char.rainbowTickets || 0;
   const claimed = progress.wishesClaimed || [false, false, false, false, false];
-  if ((progress.learnedIds || []).length < 3000) { alert("需要熟記 3000 字才能兌換！"); return; }
   if (index > 0 && !claimed[index - 1]) { alert("請先兌換上一個稱號！"); return; }
   if (claimed[index]) { alert("此稱號已獲得！"); return; }
   if (tickets < w.cost) { alert(`彩虹券不足！需要 🌈${w.cost}，目前 🌈${tickets}`); return; }
@@ -1913,7 +1953,39 @@ function redeemWish(index) {
   renderShop();
   showChestModal(w.badge,
     `🎉 恭喜獲得稱號「${w.title}」！<br>` +
-    `<span style="font-size:0.85rem;color:var(--text-light)">繼續挑戰下一個稱號</span>`);
+    `<span style="font-size:0.85rem;color:var(--text-light)">這個稱號還可以許 1 次願</span>`);
+}
+
+function redeemWishForTitle(index, cardEl) {
+  ensureChar();
+  const w = WISH_REWARDS[index];
+  const claimed = progress.wishesClaimed || [false, false, false, false, false];
+  const redeemed = progress.wishesRedeemed || [false, false, false, false, false];
+  if (!claimed[index]) { alert("請先兌換這個稱號！"); return; }
+  if (redeemed[index]) { alert("這個稱號的願望已經許過了！"); return; }
+  const amountEl = cardEl.querySelector(".wish-amount-input");
+  const wishEl = cardEl.querySelector(".wish-text-input");
+  const amount = parseInt(amountEl && amountEl.value, 10);
+  const wishText = ((wishEl && wishEl.value) || "").trim();
+  if (!amount || amount <= 0) { alert("請輸入兌換金額！"); return; }
+  if (!wishText) { alert("請輸入願望內容！"); return; }
+  const ntd = progress.char.ntd || 0;
+  if (ntd < amount) { alert(`新台幣不足！需要 💵NT$${amount}，目前 💵NT$${ntd}`); return; }
+  const pwd = prompt("請家長輸入密碼確認兌換：");
+  if (pwd === null) return;
+  if (pwd !== WISH_REDEEM_PASSWORD) { alert("密碼錯誤，兌換取消！"); return; }
+  progress.char.ntd -= amount;
+  if (!progress.wishesRedeemed) progress.wishesRedeemed = [false, false, false, false, false];
+  if (!progress.wishes) progress.wishes = ["", "", "", "", ""];
+  if (!progress.wishAmounts) progress.wishAmounts = [0, 0, 0, 0, 0];
+  progress.wishesRedeemed[index] = true;
+  progress.wishes[index] = wishText;
+  progress.wishAmounts[index] = amount;
+  saveProgress(progress);
+  renderShop();
+  showChestModal(w.badge,
+    `🎉「${wishText}」許願成功！<br>` +
+    `<span style="font-size:0.85rem;color:var(--text-light)">扣除 💵NT$${amount}（剩 💵NT$${progress.char.ntd}）</span>`);
 }
 
 // === 成就系統 ===
@@ -2025,11 +2097,14 @@ function renderAchievements() {
 function renderShop() {
   const coins = (progress.char && progress.char.coins) || 0;
   const tickets = (progress.char && progress.char.rainbowTickets) || 0;
+  const ntd = (progress.char && progress.char.ntd) || 0;
   document.querySelectorAll(".coins-display").forEach(el => el.textContent = coins);
   const shopCoins = document.getElementById("shop-coins-val");
   if (shopCoins) shopCoins.textContent = coins;
   const shopRainbow = document.getElementById("shop-rainbow-val");
   if (shopRainbow) shopRainbow.textContent = tickets;
+  const shopNtd = document.getElementById("shop-ntd-val");
+  if (shopNtd) shopNtd.textContent = ntd;
   renderWishRewards();
 }
 
@@ -2037,6 +2112,8 @@ function buyItem(item, cost) {
   ensureChar();
   // 彩虹券商品
   if (item === "dragon_sword") {
+    const learned = (progress.learnedIds || []).length;
+    if (learned < 1500) { alert(`需熟記 1500 字才能購買巨龍神劍！目前 ${learned}/1500`); return; }
     const tickets = progress.char.rainbowTickets || 0;
     const inv = progress.char.weaponInventory || [];
     const existing = inv.find(x => x.type === "dragon_sword");
@@ -2614,6 +2691,7 @@ function renderCharPanel() {
   set("inv-rainbow", c.rainbowTickets || 0);
   set("inv-universal-fragments", c.universalFragments || 0);
   set("inv-transmutation-fragments", `${c.transmutationFragments || 0}/24`);
+  set("inv-ntd", `NT$${c.ntd || 0}`);
   set("task-en-zh-status", dt.enToZhDone ? "✅" : "⬜");
   set("task-zh-en-status", dt.zhToEnDone ? "✅" : "⬜");
   set("task-challenge-status", dt.challengeDone ? "✅" : "⬜");
@@ -2834,25 +2912,18 @@ document.getElementById("back-to-today").addEventListener("click", () => {
   });
 });
 
-// === BOSS 挑戰系統 ===
-const BOSS_TIERS = [
-  { minWords: 1500, hp: 305, atk: 10 },
-  { minWords: 1200, hp: 290, atk: 9  },
-  { minWords: 900,  hp: 255, atk: 8  },
-  { minWords: 600,  hp: 190, atk: 7  },
-  { minWords: 300,  hp: 120, atk: 5  },
+// === BOSS 挑戰系統（三連戰：可重複刷關，血量記錄到下一次挑戰）===
+const BOSS_STAGES = [
+  { label: "小BOSS 1/3",   hp: 2000, atk: 3,  img: "images/strawberry.png",    alt: "小BOSS" },
+  { label: "小BOSS 2/3",   hp: 3000, atk: 5,  img: "images/boss-monster1.jpg", alt: "小BOSS" },
+  { label: "菁英 BOSS 3/3", hp: 5000, atk: 10, img: "images/boss-monster2.jpg", alt: "菁英 BOSS" },
 ];
+const BOSS_UNLOCK_WORDS = 300;
 const BOSS_TRANSMUTATION_REQUIRED = 24;
+const BOSS_RAINBOW_FRAGMENT_REQUIRED = 10;
+const BOSS_WEEKLY_NTD_CAP = 1000;
 
 let bossState = null;
-
-function getCurrentBossTier() {
-  const learned = (progress.learnedIds || []).length;
-  for (const tier of BOSS_TIERS) {
-    if (learned >= tier.minWords) return tier;
-  }
-  return null;
-}
 
 function getWeekString() {
   const d = new Date();
@@ -2861,40 +2932,61 @@ function getWeekString() {
   return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-function canFightBossThisWeek() {
+function getBossNtdEarnedThisWeek() {
   ensureChar();
-  const last = progress.lastBossFight || "";
-  return last !== getWeekString();
+  const wk = getWeekString();
+  if (progress.char.bossNtdWeek !== wk) {
+    progress.char.bossNtdWeek = wk;
+    progress.char.bossNtdEarned = 0;
+  }
+  return progress.char.bossNtdEarned;
+}
+
+// BOSS 挑戰掉落的新台幣（許願兌換現實物品用，跟遊戲金幣是不同貨幣），每週上限 1000，回傳實際發放數量
+function addBossNtd(amount) {
+  ensureChar();
+  const earned = getBossNtdEarnedThisWeek();
+  const given = Math.max(0, Math.min(amount, BOSS_WEEKLY_NTD_CAP - earned));
+  if (given > 0) {
+    progress.char.ntd = (progress.char.ntd || 0) + given;
+    progress.char.bossNtdEarned = earned + given;
+  }
+  saveProgress(progress);
+  return given;
 }
 
 function renderBossCard() {
   const card = document.getElementById("boss-challenge-card");
   if (!card) return;
-  const tier = getCurrentBossTier();
-  if (!tier) {
+  const learned = (progress.learnedIds || []).length;
+  if (learned < BOSS_UNLOCK_WORDS) {
     card.innerHTML = `<div class="boss-card-locked">
       <span class="boss-card-lock-icon">🔒</span>
-      <div class="boss-card-lock-text">菁英 BOSS 挑戰測驗<br><span>熟記 300 字後解鎖</span></div>
+      <div class="boss-card-lock-text">菁英 BOSS 挑戰測驗<br><span>熟記 ${BOSS_UNLOCK_WORDS} 字後解鎖</span></div>
     </div>`;
     return;
   }
-  const frags = (progress.char && progress.char.transmutationFragments) || 0;
-  const canFight = canFightBossThisWeek();
-  const learned = (progress.learnedIds || []).length;
-  const weekStr = getWeekString();
+  ensureChar();
+  const stage = BOSS_STAGES[progress.char.bossStageIdx];
+  const frags = progress.char.transmutationFragments || 0;
+  const rfrags = progress.char.rainbowFragments || 0;
+  const ntdEarned = getBossNtdEarnedThisWeek();
   card.innerHTML = `
-    <div class="boss-card-header">⚔️ 菁英 BOSS 挑戰測驗</div>
+    <div class="boss-card-header">⚔️ 菁英 BOSS 挑戰測驗（三連戰・可重複挑戰）</div>
     <div class="boss-card-info">
-      <span class="boss-card-tier">Tier: 熟記 ${tier.minWords}+ 字｜HP ${tier.hp}｜攻 ${tier.atk}</span>
+      <span class="boss-card-tier">目前對手：${stage.label}｜HP ${progress.char.bossStageHp}/${stage.hp}｜攻 ${stage.atk}</span>
     </div>
     <div class="boss-card-frags">
       🔮 幻化碎片：${frags} / ${BOSS_TRANSMUTATION_REQUIRED}
       <div class="boss-frag-bar-bg"><div class="boss-frag-bar-fill" style="width:${Math.min(100,(frags/BOSS_TRANSMUTATION_REQUIRED)*100).toFixed(1)}%"></div></div>
     </div>
-    <div class="boss-card-week">${canFight ? "✅ 本週可挑戰" : "⏳ 本週已挑戰（下週重置）"}</div>
-    <button class="boss-fight-btn" ${canFight ? "" : "disabled"} onclick="startBossBattle()">
-      ${canFight ? "⚔️ 開始挑戰" : "已挑戰"}
-    </button>`;
+    <div class="boss-card-frags">
+      🌈 彩虹碎片：${rfrags} / ${BOSS_RAINBOW_FRAGMENT_REQUIRED}
+      <div class="boss-frag-bar-bg"><div class="boss-frag-bar-fill" style="width:${Math.min(100,(rfrags/BOSS_RAINBOW_FRAGMENT_REQUIRED)*100).toFixed(1)}%"></div></div>
+    </div>
+    <div class="boss-card-week">💵 本週 BOSS 新台幣：NT$${ntdEarned} / ${BOSS_WEEKLY_NTD_CAP}</div>
+    <div class="boss-card-week">💵 目前累積新台幣：NT$${progress.char.ntd || 0}</div>
+    <button class="boss-fight-btn" onclick="startBossBattle()">⚔️ 開始挑戰</button>`;
 }
 
 function getBossWeakWordPool() {
@@ -2912,26 +3004,27 @@ function getBossWeakWordPool() {
 }
 
 function startBossBattle() {
-  if (!canFightBossThisWeek()) return;
-  const tier = getCurrentBossTier();
-  if (!tier) return;
+  if ((progress.learnedIds || []).length < BOSS_UNLOCK_WORDS) return;
   ensureChar();
   const pool = getBossWeakWordPool();
   if (pool.length < 4) {
     alert("熟記字數太少，至少需要 4 個單字才能挑戰！");
     return;
   }
+  const stageIdx = progress.char.bossStageIdx;
+  const stage = BOSS_STAGES[stageIdx];
   bossState = {
-    tier,
-    bossHp: tier.hp,
-    bossMaxHp: tier.hp,
+    stageIdx,
+    bossHp: progress.char.bossStageHp,
+    bossMaxHp: stage.hp,
     playerHp: getPlayerMaxHp(),
     playerMaxHp: getPlayerMaxHp(),
     pool,
     qIdx: 0,
     correct: 0,
     total: pool.length,
-    finished: false
+    finished: false,
+    stageAdvancePending: false
   };
   switchView("boss");
   renderBossBattle();
@@ -2939,8 +3032,11 @@ function startBossBattle() {
 }
 
 function renderBossBattle() {
+  const stage = BOSS_STAGES[bossState.stageIdx];
   const bossImg = document.getElementById("boss-monster-img");
-  if (bossImg) bossImg.src = "images/strawberry.png";
+  if (bossImg) { bossImg.src = stage.img; bossImg.alt = stage.alt; }
+  const labelEl = document.getElementById("boss-monster-label");
+  if (labelEl) labelEl.textContent = stage.label;
   const playerCharEl = document.getElementById("boss-player-char");
   if (playerCharEl) playerCharEl.textContent = progress.char?.avatar || "🧙";
   const battleEl = document.getElementById("boss-battle-main");
@@ -2974,10 +3070,11 @@ function updateBossPlayerHP() {
 
 function renderBossQuestion() {
   if (!bossState || bossState.finished) return;
-  if (bossState.qIdx >= bossState.pool.length) { finishBossBattle(bossState.bossHp <= 0); return; }
+  if (bossState.qIdx >= bossState.pool.length) { finishBossBattle(false); return; }
   const q = bossState.pool[bossState.qIdx];
   const progressEl = document.getElementById("boss-progress");
-  if (progressEl) progressEl.textContent = `題目 ${bossState.qIdx + 1} / ${bossState.total} ｜ BOSS HP: ${bossState.bossHp}`;
+  const stageLabel = BOSS_STAGES[bossState.stageIdx].label;
+  if (progressEl) progressEl.textContent = `題目 ${bossState.qIdx + 1} / ${bossState.total} ｜ ${stageLabel} HP: ${bossState.bossHp}`;
   const qEl = document.getElementById("boss-question");
   if (qEl) qEl.textContent = q.word;
   // 4 個選項
@@ -3005,24 +3102,33 @@ function answerBossQuestion(correct, q) {
   if (optEl) optEl.querySelectorAll(".boss-option-btn").forEach(b => b.disabled = true);
   const fb = document.getElementById("boss-feedback");
   const nextBtn = document.getElementById("boss-next-btn");
+  const stage = BOSS_STAGES[bossState.stageIdx];
   if (correct) {
     bossState.correct++;
     const atk = getPlayerAttack();
     bossState.bossHp = Math.max(0, bossState.bossHp - atk);
     updateBossHP();
-    if (fb) { fb.textContent = `✅ 正確！對 BOSS 造成 ${atk} 傷害`; fb.className = "boss-feedback boss-fb-correct"; }
-    if (bossState.bossHp <= 0) {
+    if (bossState.bossHp <= 0 && bossState.stageIdx < BOSS_STAGES.length - 1) {
+      // 小BOSS 被擊敗 → 掉新台幣（許願兌換用，非遊戲金幣），緊接著挑戰下一隻
+      const ntdRoll = 1 + Math.floor(Math.random() * 3);
+      const given = addBossNtd(ntdRoll);
+      if (fb) { fb.textContent = `✅ 擊敗 ${stage.label}！獲得 💵NT$${given}`; fb.className = "boss-feedback boss-fb-correct"; }
+      bossState.stageAdvancePending = true;
+    } else if (bossState.bossHp <= 0) {
+      // 主 BOSS 被擊敗 → 整輪挑戰成功
       bossState.finished = true;
       setTimeout(() => finishBossBattle(true), 800);
       return;
+    } else {
+      if (fb) { fb.textContent = `✅ 正確！對 ${stage.label} 造成 ${atk} 傷害`; fb.className = "boss-feedback boss-fb-correct"; }
     }
   } else {
     bossState.bossHp = Math.min(bossState.bossMaxHp, bossState.bossHp + 3);
-    const dmg = bossState.tier.atk;
+    const dmg = stage.atk;
     bossState.playerHp = Math.max(0, bossState.playerHp - dmg);
     updateBossHP();
     updateBossPlayerHP();
-    if (fb) { fb.textContent = `❌ 答錯！BOSS 回復 3HP，你受到 ${dmg} 傷害。正確：${q.meaning}`; fb.className = "boss-feedback boss-fb-wrong"; }
+    if (fb) { fb.textContent = `❌ 答錯！${stage.label} 爆擊，你受到 ${dmg} 傷害。正確：${q.meaning}`; fb.className = "boss-feedback boss-fb-wrong"; }
     if (bossState.playerHp <= 0) {
       bossState.finished = true;
       setTimeout(() => finishBossBattle(false), 800);
@@ -3035,8 +3141,19 @@ function answerBossQuestion(correct, q) {
 function nextBossQuestion() {
   if (!bossState) return;
   bossState.qIdx++;
+  if (bossState.stageAdvancePending) {
+    bossState.stageAdvancePending = false;
+    bossState.stageIdx++;
+    const nextStage = BOSS_STAGES[bossState.stageIdx];
+    bossState.bossHp = nextStage.hp;
+    bossState.bossMaxHp = nextStage.hp;
+    const bossImg = document.getElementById("boss-monster-img");
+    if (bossImg) { bossImg.src = nextStage.img; bossImg.alt = nextStage.alt; }
+    const labelEl = document.getElementById("boss-monster-label");
+    if (labelEl) labelEl.textContent = nextStage.label;
+  }
   if (bossState.qIdx >= bossState.pool.length) {
-    finishBossBattle(bossState.bossHp <= 0);
+    finishBossBattle(false);
   } else {
     renderBossQuestion();
   }
@@ -3053,23 +3170,43 @@ function finishBossBattle(victory) {
   resultEl.classList.remove("hidden");
 
   if (victory) {
-    // 記錄本週已挑戰
-    progress.lastBossFight = getWeekString();
-    // 給幻化碎片
-    progress.char.transmutationFragments = (progress.char.transmutationFragments || 0) + 1;
+    // 全部三隻擊敗 → 隨機獎勵一種，並重置回小BOSS 1 供下一輪刷關
+    const roll = Math.random();
+    let rewardLine;
+    if (roll < 1 / 3) {
+      progress.char.rainbowFragments = (progress.char.rainbowFragments || 0) + 1;
+      if (progress.char.rainbowFragments >= BOSS_RAINBOW_FRAGMENT_REQUIRED) {
+        progress.char.rainbowFragments -= BOSS_RAINBOW_FRAGMENT_REQUIRED;
+        progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 1;
+        rewardLine = `獲得 🌈 彩虹碎片 ×1 → 集滿自動兌換！彩虹券 +1（目前 🌈${progress.char.rainbowTickets}）`;
+      } else {
+        rewardLine = `獲得 🌈 彩虹碎片 ×1（共 ${progress.char.rainbowFragments}/${BOSS_RAINBOW_FRAGMENT_REQUIRED}）`;
+      }
+    } else if (roll < 2 / 3) {
+      progress.char.transmutationFragments = (progress.char.transmutationFragments || 0) + 1;
+      rewardLine = `獲得 🔮 幻化碎片 ×1（共 ${progress.char.transmutationFragments}/${BOSS_TRANSMUTATION_REQUIRED}）`;
+    } else {
+      const given = addBossNtd(3);
+      rewardLine = given > 0 ? `獲得 💵 新台幣 NT$${given}` : `本週 BOSS 新台幣已達上限，改天再來吧！`;
+    }
+    progress.char.bossStageIdx = 0;
+    progress.char.bossStageHp = BOSS_STAGES[0].hp;
     saveProgress(progress);
     resultEl.innerHTML = `
       <div class="boss-result-title boss-result-win">🎉 挑戰成功！</div>
-      <div class="boss-result-detail">答對 ${bossState.correct} / ${bossState.total} 題<br>BOSS HP 歸零！</div>
-      <div class="boss-result-reward">獲得 🔮 幻化碎片 ×1（共 ${progress.char.transmutationFragments}/${BOSS_TRANSMUTATION_REQUIRED}）</div>
+      <div class="boss-result-detail">答對 ${bossState.correct} / ${bossState.total} 題<br>擊敗全部三隻 BOSS！</div>
+      <div class="boss-result-reward">${rewardLine}</div>
       <button class="boss-back-btn" onclick="switchView('quiz'); renderBossCard();">返回測驗頁</button>`;
   } else {
-    progress.lastBossFight = getWeekString();
+    // 記錄當前對手血量，下次挑戰繼續累積傷害
+    progress.char.bossStageIdx = bossState.stageIdx;
+    progress.char.bossStageHp = Math.max(0, bossState.bossHp);
     saveProgress(progress);
+    const stage = BOSS_STAGES[bossState.stageIdx];
     resultEl.innerHTML = `
-      <div class="boss-result-title boss-result-lose">💀 挑戰失敗</div>
-      <div class="boss-result-detail">答對 ${bossState.correct} / ${bossState.total} 題<br>${bossState.playerHp <= 0 ? "HP 歸零" : "題目用盡，BOSS 未被擊敗"}</div>
-      <div class="boss-result-reward">本週挑戰機會已用盡，下週再來！</div>
+      <div class="boss-result-title boss-result-lose">💀 挑戰結束</div>
+      <div class="boss-result-detail">答對 ${bossState.correct} / ${bossState.total} 題<br>${bossState.playerHp <= 0 ? "HP 歸零" : "題目用盡"}｜${stage.label} 剩餘 HP ${Math.max(0, bossState.bossHp)}</div>
+      <div class="boss-result-reward">怪物血量已記錄，下次挑戰繼續累積傷害！</div>
       <button class="boss-back-btn" onclick="switchView('quiz'); renderBossCard();">返回測驗頁</button>`;
   }
   renderCharPanel();

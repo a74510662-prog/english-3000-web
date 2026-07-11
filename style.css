@@ -1171,6 +1171,11 @@ body {
   font-size: 0.75rem; color: #6c3fd4; font-weight: 700;
   border: 1px solid #a29bfe; border-radius: 12px; padding: 4px 8px;
 }
+.wish-redeem-input {
+  width: 100%; box-sizing: border-box; padding: 7px 10px; margin-top: 2px;
+  border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem;
+  font-family: inherit;
+}
 .shop-legend-header {
   margin: 16px 0 8px;
   font-weight: 700;
