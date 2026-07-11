@@ -3406,7 +3406,7 @@ function finishBossBattle(victory) {
       progress.char.transmutationFragments = (progress.char.transmutationFragments || 0) + 1;
       rewardLine = `獲得 🔮 幻化碎片 ×1（共 ${progress.char.transmutationFragments}/${BOSS_TRANSMUTATION_REQUIRED}）`;
     } else {
-      const given = addBossNtd(getBossNtdDropAmount());
+      const given = addBossNtd(100);
       rewardLine = given > 0 ? `獲得 💵 新台幣 NT$${given}` : `本週 BOSS 新台幣已達上限，改天再來吧！`;
     }
     progress.char.bossStageIdx = 0;
