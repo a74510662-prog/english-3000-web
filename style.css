@@ -1451,3 +1451,21 @@ body {
   border: none; border-radius: 10px; font-size: 1rem; cursor: pointer;
 }
 .boss-back-btn:active { background: var(--primary-light); }
+
+/* 設定頁 */
+.settings-card {
+  background: var(--card); border-radius: 14px;
+  padding: 16px; margin-bottom: 14px;
+  box-shadow: var(--shadow); border: 1.5px solid var(--border);
+}
+.settings-card-title { font-size: 1rem; margin-bottom: 6px; }
+.settings-card-desc { font-size: 0.82rem; color: var(--text-light); margin-bottom: 12px; line-height: 1.5; }
+.settings-action-btn {
+  width: 100%; padding: 12px; background: var(--primary); color: white;
+  border: none; border-radius: 10px; font-size: 0.95rem; cursor: pointer;
+}
+.settings-action-btn:active { background: var(--primary-light); }
+.settings-file-input {
+  display: block; width: 100%; margin-bottom: 10px;
+  font-size: 0.82rem;
+}

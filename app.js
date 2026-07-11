@@ -46,6 +46,55 @@ function deleteUser(name) {
   }
 }
 
+// === 備份/還原系統 ===
+function exportBackup() {
+  const users = getUsers();
+  const data = {
+    backupVersion: 1,
+    exportedAt: new Date().toISOString(),
+    currentUser: localStorage.getItem(CURRENT_USER_KEY) || "",
+    users,
+    progress: {}
+  };
+  users.forEach(name => {
+    const raw = localStorage.getItem(`english3000_progress_${name}`);
+    if (raw) {
+      try { data.progress[name] = JSON.parse(raw); } catch { /* skip corrupt entry */ }
+    }
+  });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const dateStr = todayDateString().replace(/-/g, "");
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `english3000_backup_${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function importBackupFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); }
+    catch { alert("備份檔案讀取失敗，請確認檔案是否正確！"); return; }
+    if (!data || !Array.isArray(data.users) || !data.progress) { alert("備份檔案格式不正確！"); return; }
+    if (!confirm(`確定要還原這份備份嗎？\n將會覆蓋目前裝置上共 ${data.users.length} 位學習者的資料，此動作無法復原！`)) return;
+    data.users.forEach(name => {
+      if (data.progress[name]) {
+        localStorage.setItem(`english3000_progress_${name}`, JSON.stringify(data.progress[name]));
+      }
+    });
+    saveUsers(data.users);
+    if (data.currentUser) localStorage.setItem(CURRENT_USER_KEY, data.currentUser);
+    alert("還原成功！即將重新整理頁面。");
+    window.location.reload();
+  };
+  reader.readAsText(file);
+}
+
 function selectUser(name) {
   currentUser = name;
   STORAGE_KEY = `english3000_progress_${name}`;
@@ -207,7 +256,7 @@ function switchView(view) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.getElementById(`view-${view}`).classList.add("active");
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-  const titles = { cards: "今日單字", quiz: "隨堂測驗", progress: "學習進度", char: "角色道具", weapon: "裝備庫", shop: "商店", achievement: "成就", boss: "菁英 BOSS 挑戰測驗" };
+  const titles = { cards: "今日單字", quiz: "隨堂測驗", progress: "學習進度", char: "角色道具", weapon: "裝備庫", shop: "商店", achievement: "成就", boss: "菁英 BOSS 挑戰測驗", settings: "設定" };
   document.getElementById("page-title").textContent = titles[view] || view;
   if (view === "progress") renderProgress();
   if (view === "quiz") { resetQuizSetup(); renderBossCard(); }
@@ -2909,6 +2958,15 @@ document.getElementById("back-to-today").addEventListener("click", () => {
       const cost = parseInt(btn.dataset.cost, 10);
       buyItem(item, cost);
     });
+  });
+
+  // 設定頁：備份/還原
+  document.getElementById("backup-export-btn").addEventListener("click", exportBackup);
+  document.getElementById("backup-import-btn").addEventListener("click", () => {
+    const fileInput = document.getElementById("backup-import-input");
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) { alert("請先選擇備份檔案！"); return; }
+    importBackupFile(file);
   });
 });
 

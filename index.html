@@ -331,6 +331,26 @@
       <div id="achievement-milestone-list"></div>
     </section>
 
+    <!-- 設定頁 -->
+    <section id="view-settings" class="view">
+      <div class="settings-card">
+        <h3 class="settings-card-title">🔄 版本更新</h3>
+        <p class="settings-card-desc">網站有新版本時，按下方按鈕強制檢查並更新，不用重複關閉重開。</p>
+        <button id="update-check-btn" class="settings-action-btn">🔄 檢查更新</button>
+      </div>
+      <div class="settings-card">
+        <h3 class="settings-card-title">📤 備份學習資料</h3>
+        <p class="settings-card-desc">將所有學習者的進度（單字、等級、金幣、彩虹券、新台幣、稱號等）匯出成一個檔案，建議定期備份，避免資料遺失。</p>
+        <button id="backup-export-btn" class="settings-action-btn">📤 匯出備份</button>
+      </div>
+      <div class="settings-card">
+        <h3 class="settings-card-title">📥 還原學習資料</h3>
+        <p class="settings-card-desc">選擇先前匯出的備份檔案來還原，這會覆蓋目前裝置上的所有學習者資料，請小心操作。</p>
+        <input type="file" id="backup-import-input" accept="application/json" class="settings-file-input">
+        <button id="backup-import-btn" class="settings-action-btn">📥 選擇檔案並還原</button>
+      </div>
+    </section>
+
     <!-- 裝備庫頁 -->
     <section id="view-weapon" class="view">
       <h3 class="equip-section-header">⚔️ 武器</h3>
@@ -392,16 +412,44 @@
     <button class="nav-btn" data-view="achievement">
       <span class="nav-icon">🏆</span><span>成就</span>
     </button>
+    <button class="nav-btn" data-view="settings">
+      <span class="nav-icon">⚙️</span><span>設定</span>
+    </button>
   </nav>
 
   <script src="words.js"></script>
   <script src="app.js"></script>
   <script>
+    let swRegistration = null;
+    let swReloading = false;
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' })
+          .then(reg => { swRegistration = reg; })
+          .catch(() => {});
+      });
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (swReloading) return;
+        swReloading = true;
+        window.location.reload();
       });
     }
+    document.getElementById('update-check-btn').addEventListener('click', () => {
+      const btn = document.getElementById('update-check-btn');
+      if (!swRegistration) { alert('目前無法檢查更新，請稍後再試'); return; }
+      btn.textContent = '⏳ 檢查中...';
+      let updated = false;
+      swRegistration.addEventListener('updatefound', () => { updated = true; });
+      swRegistration.update().then(() => {
+        setTimeout(() => {
+          btn.textContent = '🔄 檢查更新';
+          if (!updated) alert('目前已經是最新版本！');
+        }, 2500);
+      }).catch(() => {
+        btn.textContent = '🔄 檢查更新';
+        alert('檢查更新失敗，請確認網路連線');
+      });
+    });
   </script>
 </body>
 </html>
