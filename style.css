@@ -417,7 +417,12 @@ body {
 }
 .nav-btn:active { background: var(--bg); }
 .nav-btn.active { color: var(--primary); border-left-color: var(--primary); background: #eef4fa; }
-.nav-icon { font-size: 1.4rem; }
+.nav-icon { font-size: 1.4rem; position: relative; display: inline-block; }
+.nav-badge-dot {
+  position: absolute; top: -2px; right: -6px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #e74c3c; border: 1.5px solid var(--card, #fff);
+}
 
 /* 戰鬥場景 */
 .battle-arena {

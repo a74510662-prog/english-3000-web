@@ -47,6 +47,24 @@ function deleteUser(name) {
 }
 
 // === 備份/還原系統 ===
+const BACKUP_LAST_WEEK_KEY = "english3000_last_backup_week";
+
+function needsBackupReminder() {
+  return localStorage.getItem(BACKUP_LAST_WEEK_KEY) !== getWeekString();
+}
+
+function renderBackupReminder() {
+  const badge = document.getElementById("settings-nav-badge");
+  const statusEl = document.getElementById("backup-status-text");
+  const overdue = needsBackupReminder();
+  if (badge) badge.classList.toggle("hidden", !overdue);
+  if (statusEl) {
+    statusEl.textContent = overdue
+      ? "⚠️ 本週還沒有備份，快點下方按鈕備份拿獎勵！"
+      : "✅ 本週已備份過了，感謝你保護學習紀錄！";
+  }
+}
+
 function exportBackup() {
   const users = getUsers();
   const data = {
@@ -64,14 +82,26 @@ function exportBackup() {
   });
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-  const dateStr = todayDateString().replace(/-/g, "");
   const a = document.createElement("a");
   a.href = url;
-  a.download = `english3000_backup_${dateStr}.json`;
+  // 固定檔名，方便每次存檔時直接覆蓋上一份備份（瀏覽器/系統仍可能詢問是否取代）
+  a.download = "english3000_backup.json";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  if (needsBackupReminder()) {
+    localStorage.setItem(BACKUP_LAST_WEEK_KEY, getWeekString());
+    if (currentUser) {
+      const reward = grantWeaponFragment();
+      saveProgress(progress);
+      updateCoinsDisplay();
+      renderCharPanel();
+      showChestModal(reward.emoji, `📤 匯出備份成功！每週備份獎勵：<br>${reward.text}`);
+    }
+  }
+  renderBackupReminder();
 }
 
 function importBackupFile(file) {
@@ -2157,6 +2187,46 @@ function renderShop() {
   renderWishRewards();
 }
 
+// 給予一份武器碎片獎勵（本階段限定武器，滿等後累計升級，全滿等則給通用碎片），回傳 {emoji, text} 供 showChestModal 使用
+function grantWeaponFragment() {
+  ensureChar();
+  const inv = progress.char.weaponInventory || [];
+  if (allUnlockedWeaponsMaxed()) {
+    progress.char.universalFragments = (progress.char.universalFragments || 0) + 1;
+    progress.char.weaponInventory = inv;
+    return { emoji: "🔧", text: `所有武器已滿等<br>獲得 🔧 通用武器碎片 ×1（共 ${progress.char.universalFragments}）` };
+  }
+  const wStage = getWeaponStage();
+  const atk = WEAPON_STAGE_ATK[wStage] || 1;
+  const pool = STAGE_WEAPON_POOLS[wStage] || ["dagger"];
+  const unmaxed = pool.filter(k => { const w = inv.find(x => x.type === k); return !w || (w.level || 0) < 10; });
+  const pickPool = unmaxed.length > 0 ? unmaxed : pool;
+  const typeKey = pickPool[Math.floor(Math.random() * pickPool.length)];
+  const wt = getWeaponTypeData(typeKey);
+  const existing = inv.find(x => x.type === typeKey);
+  let upgradeText = "";
+  if (existing) {
+    existing.attack = Math.max(existing.attack, atk);
+    if ((existing.level || 0) >= 10) {
+      upgradeText = `<br>（${wt.name} 已達最高等級 Lv.10）`;
+    } else {
+      existing.count = (existing.count || 0) + 1;
+      if (existing.count >= 5) {
+        existing.count -= 5;
+        existing.level = (existing.level || 0) + 1;
+        upgradeText = existing.level >= 10
+          ? `<br>🏆 ${wt.name} 達到最高等級 Lv.10！`
+          : `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
+      }
+    }
+  } else {
+    inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
+    if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
+  }
+  progress.char.weaponInventory = inv;
+  return { emoji: wt.emoji, text: `${wt.name} 碎片 ×1${upgradeText}` };
+}
+
 function buyItem(item, cost) {
   ensureChar();
   // 彩虹券商品
@@ -2187,48 +2257,11 @@ function buyItem(item, cost) {
     renderShop();
     alert(`購買成功！🧪 HP 藥水 ×1（目前 ${progress.char.potions} 瓶）`);
   } else if (item === "weapon") {
-    const inv = progress.char.weaponInventory || [];
-    if (allUnlockedWeaponsMaxed()) {
-      progress.char.universalFragments = (progress.char.universalFragments || 0) + 1;
-      progress.char.weaponInventory = inv;
-      saveProgress(progress);
-      updateCoinsDisplay();
-      renderShop();
-      showChestModal("🔧", `所有武器已滿等<br>獲得 🔧 通用武器碎片 ×1（共 ${progress.char.universalFragments}）`);
-    } else {
-      const wStage = getWeaponStage();
-      const atk = WEAPON_STAGE_ATK[wStage] || 1;
-      const pool = STAGE_WEAPON_POOLS[wStage] || ["dagger"];
-      const unmaxed = pool.filter(k => { const w = inv.find(x => x.type === k); return !w || (w.level || 0) < 10; });
-      const pickPool = unmaxed.length > 0 ? unmaxed : pool;
-      const typeKey = pickPool[Math.floor(Math.random() * pickPool.length)];
-      const wt = getWeaponTypeData(typeKey);
-      const existing = inv.find(x => x.type === typeKey);
-      let upgradeText = "";
-      if (existing) {
-        existing.attack = Math.max(existing.attack, atk);
-        if ((existing.level || 0) >= 10) {
-          upgradeText = `<br>（${wt.name} 已達最高等級 Lv.10）`;
-        } else {
-          existing.count = (existing.count || 0) + 1;
-          if (existing.count >= 5) {
-            existing.count -= 5;
-            existing.level = (existing.level || 0) + 1;
-            upgradeText = existing.level >= 10
-              ? `<br>🏆 ${wt.name} 達到最高等級 Lv.10！`
-              : `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
-          }
-        }
-      } else {
-        inv.push({ type: typeKey, attack: atk, level: 0, count: 1 });
-        if (!progress.char.equippedWeapon) progress.char.equippedWeapon = typeKey;
-      }
-      progress.char.weaponInventory = inv;
-      saveProgress(progress);
-      updateCoinsDisplay();
-      renderShop();
-      showChestModal(wt.emoji, `${wt.name} 碎片 ×1${upgradeText}`);
-    }
+    const reward = grantWeaponFragment();
+    saveProgress(progress);
+    updateCoinsDisplay();
+    renderShop();
+    showChestModal(reward.emoji, reward.text);
   } else if (item === "exp") {
     saveProgress(progress);
     const leveled = addExp(1);
@@ -2875,6 +2908,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   initSfxUnlock();
+  renderBackupReminder();
   document.getElementById("switch-user-btn").addEventListener("click", showUserPicker);
   document.getElementById("sfx-toggle-btn").addEventListener("click", () => {
     _sfxMuted = !_sfxMuted;
