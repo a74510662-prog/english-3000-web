@@ -1580,8 +1580,8 @@ function playDefeatSfx() {
   [523, 494, 466, 440].forEach((freq, i) => sfxOsc(ctx, 'sine', freq, freq * 0.92, 0.28, 0.22, t + i * 0.3));
 }
 
-function showDamageNumber(dmg, isCritical, color) {
-  const arena = document.getElementById("battle-arena");
+function showDamageNumber(dmg, isCritical, color, arenaId) {
+  const arena = document.getElementById(arenaId || "battle-arena");
   if (!arena) return;
   const el = document.createElement("div");
   el.className = "damage-number" + (isCritical ? " crit-dmg" : "");
@@ -1593,8 +1593,8 @@ function showDamageNumber(dmg, isCritical, color) {
   setTimeout(() => el.remove(), 950);
 }
 
-function createParticles(wt, isCritical) {
-  const arena = document.getElementById("battle-arena");
+function createParticles(wt, isCritical, arenaId) {
+  const arena = document.getElementById(arenaId || "battle-arena");
   if (!arena) return;
   const count = isCritical ? 10 : 5;
   for (let i = 0; i < count; i++) {
@@ -1609,8 +1609,8 @@ function createParticles(wt, isCritical) {
   }
 }
 
-function shakeArena(isCritical) {
-  const arena = document.getElementById("battle-arena");
+function shakeArena(isCritical, arenaId) {
+  const arena = document.getElementById(arenaId || "battle-arena");
   if (!arena) return;
   arena.classList.remove("shaking", "shaking-big");
   void arena.offsetWidth;
@@ -3195,20 +3195,35 @@ function answerBossQuestion(correct, q) {
   const fb = document.getElementById("boss-feedback");
   const nextBtn = document.getElementById("boss-next-btn");
   const stage = BOSS_STAGES[bossState.stageIdx];
+  const playerEl = document.getElementById("boss-player-char");
+  const monsterEl = document.getElementById("boss-monster-img");
+  const equippedItem = getEquippedWeaponItem();
+  const wt = getWeaponTypeData(equippedItem?.type);
+
   if (correct) {
     bossState.correct++;
     const atk = getPlayerAttack();
     bossState.bossHp = Math.max(0, bossState.bossHp - atk);
     updateBossHP();
+
+    if (playerEl) { playerEl.classList.remove("attacking"); void playerEl.offsetWidth; playerEl.classList.add("attacking"); }
+    if (monsterEl) { monsterEl.classList.remove("hit"); void monsterEl.offsetWidth; monsterEl.classList.add("hit"); }
+    showDamageNumber(atk, false, wt.color, "boss-arena");
+    createParticles(wt, false, "boss-arena");
+    shakeArena(false, "boss-arena");
+    playWeaponSfx(equippedItem?.type || "dagger");
+
     if (bossState.bossHp <= 0 && bossState.stageIdx < BOSS_STAGES.length - 1) {
       // 小BOSS 被擊敗 → 掉新台幣（許願兌換用，非遊戲金幣），緊接著挑戰下一隻
       const ntdRoll = 1 + Math.floor(Math.random() * 3);
       const given = addBossNtd(ntdRoll);
       if (fb) { fb.textContent = `✅ 擊敗 ${stage.label}！獲得 💵NT$${given}`; fb.className = "boss-feedback boss-fb-correct"; }
       bossState.stageAdvancePending = true;
+      playMonsterDeathSfx();
     } else if (bossState.bossHp <= 0) {
       // 主 BOSS 被擊敗 → 整輪挑戰成功
       bossState.finished = true;
+      playMonsterDeathSfx();
       setTimeout(() => finishBossBattle(true), 800);
       return;
     } else {
@@ -3220,6 +3235,12 @@ function answerBossQuestion(correct, q) {
     bossState.playerHp = Math.max(0, bossState.playerHp - dmg);
     updateBossHP();
     updateBossPlayerHP();
+
+    if (monsterEl) { monsterEl.classList.remove("monster-attacking"); void monsterEl.offsetWidth; monsterEl.classList.add("monster-attacking"); }
+    if (playerEl) { playerEl.classList.remove("player-hit"); void playerEl.offsetWidth; playerEl.classList.add("player-hit"); }
+    shakeArena(false, "boss-arena");
+    playMonsterAttackSfx();
+
     if (fb) { fb.textContent = `❌ 答錯！${stage.label} 爆擊，你受到 ${dmg} 傷害。正確：${q.meaning}`; fb.className = "boss-feedback boss-fb-wrong"; }
     if (bossState.playerHp <= 0) {
       bossState.finished = true;
@@ -3262,6 +3283,7 @@ function finishBossBattle(victory) {
   resultEl.classList.remove("hidden");
 
   if (victory) {
+    playVictorySfx();
     // 全部三隻擊敗 → 隨機獎勵一種，並重置回小BOSS 1 供下一輪刷關
     const roll = Math.random();
     let rewardLine;
@@ -3290,6 +3312,7 @@ function finishBossBattle(victory) {
       <div class="boss-result-reward">${rewardLine}</div>
       <button class="boss-back-btn" onclick="switchView('quiz'); renderBossCard();">返回測驗頁</button>`;
   } else {
+    playDefeatSfx();
     // 記錄當前對手血量，下次挑戰繼續累積傷害
     progress.char.bossStageIdx = bossState.stageIdx;
     progress.char.bossStageHp = Math.max(0, bossState.bossHp);

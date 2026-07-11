@@ -1386,7 +1386,10 @@ body {
   padding: 16px 8px 8px;
   background: linear-gradient(180deg, #1a1a2e, #16213e);
   border-radius: 14px; margin-bottom: 10px; min-height: 120px;
+  position: relative; overflow: hidden;
 }
+.boss-arena.shaking     { animation: arena-shake 0.4s ease-out; }
+.boss-arena.shaking-big { animation: arena-shake-big 0.5s ease-out; }
 .boss-fighter {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
