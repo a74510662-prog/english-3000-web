@@ -1071,39 +1071,51 @@ function getUltimateLevel() {
 const CLASSES = [
   { key: "shadow_blade", name: "影刃", emoji: "🗡️", weapon: "dagger",
     stats: { hp: 0, atk: 2, def: 0 },
+    ultName: "夜帷斷罪・虛空滅殺斬",
     skillDesc: lv => `速攻追加傷害 -${lv + 1}` },
   { key: "ranger", name: "遊俠", emoji: "🏹", weapon: "bow",
     stats: { hp: 0, atk: 1, def: 1 },
+    ultName: "蒼穹貫殺・終焉獵殺箭",
     skillDesc: lv => `答對穿透 +${lv} 固定傷害` },
   { key: "sorcerer", name: "術士", emoji: "🪄", weapon: "staff",
     stats: { hp: 1, atk: 0, def: 1 },
+    ultName: "虛數禁咒・因果重寫術",
     skillDesc: lv => `連答對 3 題，下題消除 ${lv} 個錯誤選項` },
   { key: "hunter", name: "獵人", emoji: "🪃", weapon: "boomerang",
     stats: { hp: 0, atk: 2, def: -1 },
+    ultName: "混沌輪迴・百獸狩獵陣",
     skillDesc: lv => `連答 ${lv <= 2 ? 3 : 2} 題，傷害 ×${lv + 1}` },
   { key: "guardian", name: "鐵衛", emoji: "⚒️", weapon: "hammer",
     stats: { hp: 3, atk: 0, def: 2 },
+    ultName: "絕對堡壘・鋼鐵審判鎚",
     skillDesc: lv => `每場戰鬥開始 HP +${lv}` },
   { key: "sea_god", name: "海神", emoji: "🔱", weapon: "trident",
     stats: { hp: 0, atk: 1, def: 1 },
+    ultName: "深淵降臨・海皇審判浪",
     skillDesc: lv => `中毒最多疊 ${lv + 1} 層` },
   { key: "flame", name: "炎武", emoji: "🔥", weapon: "fire",
     stats: { hp: 0, atk: 3, def: -1 },
+    ultName: "業火燎原・煉獄斷罪劍",
     skillDesc: lv => `連答 3 題觸發全場燃燒，持續 ${lv + 1} 題` },
   { key: "ice_spirit", name: "冰靈", emoji: "❄️", weapon: "ice",
     stats: { hp: 1, atk: 1, def: 1 },
+    ultName: "永劫凍結・絕對零度領域",
     skillDesc: lv => `凍結期間傷害 ×${lv + 1}` },
   { key: "thunder", name: "雷霸", emoji: "⚡", weapon: "thunder",
     stats: { hp: 1, atk: 2, def: 0 },
+    ultName: "雷霆萬鈞・審判雷神鎚",
     skillDesc: lv => `爆擊後 ${30 + lv * 10}% 機率連鎖閃電` },
   { key: "shadow", name: "暗影", emoji: "🌙", weapon: "dark",
     stats: { hp: -1, atk: 2, def: 0 },
+    ultName: "虛無低語・深淵吞噬爪",
     skillDesc: lv => `連殺吸血遞增，起始 +${lv}` },
   { key: "paladin", name: "聖騎", emoji: "💎", weapon: "holy",
     stats: { hp: 2, atk: 0, def: 2 },
+    ultName: "聖光降臨・神罰裁決光",
     skillDesc: lv => `每 ${Math.max(1, 4 - lv)} 題答對回血 1` },
   { key: "dragon_heir", name: "龍裔", emoji: "🐉", weapon: "dragon_sword",
     stats: { hp: 1, atk: 3, def: 1 },
+    ultName: "龍神顯現・破滅神威炎",
     skillDesc: lv => `護盾蓄滿 ${Math.max(2, 10 - lv * 2)} HP 自動爆擊` },
 ];
 
@@ -3443,7 +3455,7 @@ function useUltimate() {
   const fb = document.getElementById("boss-feedback");
   const nextBtn = document.getElementById("boss-next-btn");
   const stage = BOSS_STAGES[bossState.stageIdx];
-  const ultName = `${cls.emoji}${cls.name}絕招`;
+  const ultName = `${cls.emoji}${cls.ultName || cls.name + "絕招"}`;
 
   showBossSpecialBanner(ultName, `Lv.${lv} 爆發攻擊！`);
   shakeArena(true, "boss-arena");
