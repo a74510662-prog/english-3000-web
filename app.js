@@ -3426,7 +3426,7 @@ function triggerBossSpecialAttack(stage) {
 }
 
 // 玩家絕招：能量滿 100 後手動施放，依絕招等級對 BOSS 造成其當前階段血量上限的一定比例傷害
-const ULTIMATE_DAMAGE_PCT = [0, 0.08, 0.11, 0.14, 0.17, 0.20];
+const ULTIMATE_DAMAGE_PCT = [0, 0.04, 0.055, 0.07, 0.085, 0.10];
 function useUltimate() {
   if (!bossState || bossState.finished) return;
   const lv = getUltimateLevel();
