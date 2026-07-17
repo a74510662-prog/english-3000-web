@@ -1057,6 +1057,17 @@ const WORD_MILESTONES = [
   { id: "c200", clears: 200, armor: "paradise_cape", lvl: 4, label: "熟記模式第 200 次破關" },
 ];
 
+// 絕招等級：熟記字數達門檻時提升一級（跟隨目前裝備職業使用）
+const ULTIMATE_LEVEL_WORDS = [600, 1200, 1800, 2400, 3000];
+function getUltimateLevel() {
+  const learned = (progress.learnedIds || []).length;
+  let lv = 0;
+  for (let i = 0; i < ULTIMATE_LEVEL_WORDS.length; i++) {
+    if (learned >= ULTIMATE_LEVEL_WORDS[i]) lv = i + 1;
+  }
+  return lv;
+}
+
 const CLASSES = [
   { key: "shadow_blade", name: "影刃", emoji: "🗡️", weapon: "dagger",
     stats: { hp: 0, atk: 2, def: 0 },
@@ -2891,6 +2902,13 @@ function renderClassPanel() {
       <span class="class-skill-desc">${equippedCls.skillDesc(lv)}</span>
       ${lv < 5 ? `<span class="class-next-lv">下等：再熟記 ${Math.max(0, remaining)} 字</span>` : `<span class="class-next-lv" style="color:#ffd700">★ 滿等</span>`}
     </div>`;
+    const ultLv = getUltimateLevel();
+    const nextUltWords = ultLv < 5 ? ULTIMATE_LEVEL_WORDS[ultLv] : null;
+    html += `<div class="class-equipped-row">
+      <span class="class-badge">🌟 絕招 Lv.${ultLv}</span>
+      <span class="class-skill-desc">${ultLv > 0 ? "菁英BOSS戰答對可蓄能，能量滿100可手動施放絕招" : "熟記 600 字後解鎖"}</span>
+      ${nextUltWords != null ? `<span class="class-next-lv">下等：再熟記 ${Math.max(0, nextUltWords - learnedCount)} 字</span>` : `<span class="class-next-lv" style="color:#ffd700">★ 滿等</span>`}
+    </div>`;
   }
   html += `<div class="class-list">`;
   CLASSES.forEach(cls => {
@@ -3011,6 +3029,8 @@ document.getElementById("back-to-today").addEventListener("click", () => {
     btn.addEventListener("click", () => openChests(parseInt(btn.dataset.count, 10)));
   });
   document.getElementById("quiz-use-potion-btn").addEventListener("click", usePotion);
+  document.getElementById("boss-ultimate-btn").addEventListener("click", useUltimate);
+  document.getElementById("boss-use-potion-btn").addEventListener("click", useBossPotion);
   document.getElementById("chest-close-btn").addEventListener("click", () => {
     document.getElementById("chest-modal").classList.add("hidden");
   });
@@ -3173,6 +3193,8 @@ function startBossBattle() {
     qIdx: 0,
     correct: 0,
     total: pool.length,
+    energy: 0,
+    streak: 0,
     finished: false,
     stageAdvancePending: false
   };
@@ -3195,6 +3217,25 @@ function renderBossBattle() {
   if (resultEl) resultEl.classList.add("hidden");
   updateBossHP();
   updateBossPlayerHP();
+  updateBossUltimateUI();
+}
+
+function updateBossUltimateUI() {
+  const row = document.getElementById("boss-ultimate-row");
+  const btn = document.getElementById("boss-ultimate-btn");
+  const fill = document.getElementById("boss-energy-fill");
+  if (!row || !btn) return;
+  const lv = getUltimateLevel();
+  const cls = getEquippedClassDef();
+  if (lv <= 0 || !cls) {
+    row.classList.add("hidden");
+    return;
+  }
+  row.classList.remove("hidden");
+  const energy = Math.min(100, (bossState && bossState.energy) || 0);
+  if (fill) fill.style.width = energy + "%";
+  btn.innerHTML = `${cls.emoji} ${cls.name}絕招 Lv.${lv} <span id="boss-energy-val">${energy}</span>/100`;
+  btn.disabled = !bossState || bossState.finished || energy < 100;
 }
 
 function updateBossHP() {
@@ -3216,6 +3257,28 @@ function updateBossPlayerHP() {
     el.textContent = `${Math.max(0, bossState.playerHp)} / ${bossState.playerMaxHp}`;
     el.style.color = bossState.playerHp <= 1 ? "#e74c3c" : bossState.playerHp <= Math.ceil(bossState.playerMaxHp / 2) ? "#f39c12" : "#27ae60";
   }
+  updateBossPotionBtn();
+}
+
+function updateBossPotionBtn() {
+  const btn = document.getElementById("boss-use-potion-btn");
+  const countEl = document.getElementById("boss-potion-count");
+  if (!btn) return;
+  const count = (progress.char && progress.char.potions) ? progress.char.potions : 0;
+  if (countEl) countEl.textContent = count;
+  btn.disabled = !bossState || count <= 0 || bossState.playerHp >= bossState.playerMaxHp;
+}
+
+function useBossPotion() {
+  ensureChar();
+  if (!bossState || bossState.finished) return;
+  if (progress.char.potions <= 0) { alert("沒有藥水！"); return; }
+  if (bossState.playerHp >= bossState.playerMaxHp) { alert("HP 已滿！"); return; }
+  progress.char.potions--;
+  bossState.playerHp = Math.min(bossState.playerHp + 1, bossState.playerMaxHp);
+  saveProgress(progress);
+  updateBossPlayerHP();
+  renderCharPanel();
 }
 
 function renderBossQuestion() {
@@ -3260,6 +3323,10 @@ function answerBossQuestion(correct, q) {
 
   if (correct) {
     bossState.correct++;
+    bossState.streak = (bossState.streak || 0) + 1;
+    const energyGain = bossState.streak >= 2 ? 20 : 10;
+    bossState.energy = Math.min(100, (bossState.energy || 0) + energyGain);
+    updateBossUltimateUI();
     const atk = getPlayerAttack();
     const prevHp = bossState.bossHp;
     bossState.bossHp = Math.max(0, bossState.bossHp - atk);
@@ -3295,6 +3362,7 @@ function answerBossQuestion(correct, q) {
       }
     }
   } else {
+    bossState.streak = 0;
     bossState.bossHp = Math.min(bossState.bossMaxHp, bossState.bossHp + 3);
     const dmg = stage.atk;
     bossState.playerHp = Math.max(0, bossState.playerHp - dmg);
@@ -3357,6 +3425,63 @@ function triggerBossSpecialAttack(stage) {
   }, 1300);
 }
 
+// 玩家絕招：能量滿 100 後手動施放，依絕招等級對 BOSS 造成其當前階段血量上限的一定比例傷害
+const ULTIMATE_DAMAGE_PCT = [0, 0.08, 0.11, 0.14, 0.17, 0.20];
+function useUltimate() {
+  if (!bossState || bossState.finished) return;
+  const lv = getUltimateLevel();
+  if (lv <= 0) return;
+  if ((bossState.energy || 0) < 100) return;
+  const cls = getEquippedClassDef();
+  if (!cls) return;
+
+  bossState.energy = 0;
+  updateBossUltimateUI();
+
+  const optEl = document.getElementById("boss-options");
+  if (optEl) optEl.querySelectorAll(".boss-option-btn").forEach(b => b.disabled = true);
+  const fb = document.getElementById("boss-feedback");
+  const nextBtn = document.getElementById("boss-next-btn");
+  const stage = BOSS_STAGES[bossState.stageIdx];
+  const ultName = `${cls.emoji}${cls.name}絕招`;
+
+  showBossSpecialBanner(ultName, `Lv.${lv} 爆發攻擊！`);
+  shakeArena(true, "boss-arena");
+  playBossSpecialSfx();
+
+  const dmg = Math.round(bossState.bossMaxHp * ULTIMATE_DAMAGE_PCT[lv]);
+  const prevHp = bossState.bossHp;
+  bossState.bossHp = Math.max(0, bossState.bossHp - dmg);
+  updateBossHP();
+
+  const monsterEl = document.getElementById("boss-monster-img");
+  if (monsterEl) { monsterEl.classList.remove("hit"); void monsterEl.offsetWidth; monsterEl.classList.add("hit"); }
+  showDamageNumber(dmg, true, "#ffd700", "boss-arena");
+
+  if (bossState.bossHp <= 0 && bossState.stageIdx < BOSS_STAGES.length - 1) {
+    const ntdRoll = getBossNtdDropAmount();
+    const given = addBossNtd(ntdRoll);
+    if (fb) { fb.textContent = `✅ ${ultName}擊敗 ${stage.label}！獲得 💵NT$${given}`; fb.className = "boss-feedback boss-fb-correct"; }
+    bossState.stageAdvancePending = true;
+    playMonsterDeathSfx();
+    if (nextBtn) nextBtn.classList.remove("hidden");
+  } else if (bossState.bossHp <= 0) {
+    bossState.finished = true;
+    playMonsterDeathSfx();
+    setTimeout(() => finishBossBattle(true), 800);
+  } else {
+    if (fb) { fb.textContent = `💥 ${ultName}！對 ${stage.label} 造成 ${dmg} 傷害`; fb.className = "boss-feedback boss-fb-correct"; }
+    const prevCount = getSpecialThresholdCount(bossState.bossMaxHp, prevHp);
+    const newCount = getSpecialThresholdCount(bossState.bossMaxHp, bossState.bossHp);
+    if (newCount > prevCount && stage.special) {
+      setTimeout(() => triggerBossSpecialAttack(stage), 700);
+    } else {
+      if (nextBtn) nextBtn.classList.remove("hidden");
+    }
+  }
+  saveProgress(progress);
+}
+
 function nextBossQuestion() {
   if (!bossState) return;
   bossState.qIdx++;
@@ -3390,25 +3515,24 @@ function finishBossBattle(victory) {
 
   if (victory) {
     playVictorySfx();
-    // 全部三隻擊敗 → 隨機獎勵一種，並重置回小BOSS 1 供下一輪刷關
-    const roll = Math.random();
-    let rewardLine;
-    if (roll < 1 / 3) {
+    // 全部三隻擊敗（菁英BOSS）→ 必定獲得 100 新台幣 + 彩虹碎片或幻化碎片其中一種，並重置回小BOSS 1 供下一輪刷關
+    const given = addBossNtd(100);
+    const ntdLine = given > 0 ? `獲得 💵 新台幣 NT$${given}` : `本週 BOSS 新台幣已達上限`;
+    let fragLine;
+    if (Math.random() < 0.5) {
       progress.char.rainbowFragments = (progress.char.rainbowFragments || 0) + 1;
       if (progress.char.rainbowFragments >= BOSS_RAINBOW_FRAGMENT_REQUIRED) {
         progress.char.rainbowFragments -= BOSS_RAINBOW_FRAGMENT_REQUIRED;
         progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 1;
-        rewardLine = `獲得 🌈 彩虹碎片 ×1 → 集滿自動兌換！彩虹券 +1（目前 🌈${progress.char.rainbowTickets}）`;
+        fragLine = `獲得 🌈 彩虹碎片 ×1 → 集滿自動兌換！彩虹券 +1（目前 🌈${progress.char.rainbowTickets}）`;
       } else {
-        rewardLine = `獲得 🌈 彩虹碎片 ×1（共 ${progress.char.rainbowFragments}/${BOSS_RAINBOW_FRAGMENT_REQUIRED}）`;
+        fragLine = `獲得 🌈 彩虹碎片 ×1（共 ${progress.char.rainbowFragments}/${BOSS_RAINBOW_FRAGMENT_REQUIRED}）`;
       }
-    } else if (roll < 2 / 3) {
-      progress.char.transmutationFragments = (progress.char.transmutationFragments || 0) + 1;
-      rewardLine = `獲得 🔮 幻化碎片 ×1（共 ${progress.char.transmutationFragments}/${BOSS_TRANSMUTATION_REQUIRED}）`;
     } else {
-      const given = addBossNtd(100);
-      rewardLine = given > 0 ? `獲得 💵 新台幣 NT$${given}` : `本週 BOSS 新台幣已達上限，改天再來吧！`;
+      progress.char.transmutationFragments = (progress.char.transmutationFragments || 0) + 1;
+      fragLine = `獲得 🔮 幻化碎片 ×1（共 ${progress.char.transmutationFragments}/${BOSS_TRANSMUTATION_REQUIRED}）`;
     }
+    const rewardLine = `${ntdLine}<br>${fragLine}`;
     progress.char.bossStageIdx = 0;
     progress.char.bossStageHp = BOSS_STAGES[0].hp;
     saveProgress(progress);

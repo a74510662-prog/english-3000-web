@@ -1454,6 +1454,22 @@ body {
 .boss-hp-text {
   font-size: 0.75rem; color: rgba(255,255,255,0.8);
 }
+.boss-ultimate-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.boss-energy-bar-bg {
+  flex: 1; height: 8px; background: rgba(0,0,0,0.1);
+  border-radius: 4px; overflow: hidden;
+}
+.boss-energy-fill {
+  height: 100%; background: linear-gradient(90deg, #fdcb6e, #e17055);
+  border-radius: 4px; transition: width 0.3s;
+}
+.boss-ultimate-btn {
+  background: none; border: 1px solid var(--border); border-radius: 16px;
+  padding: 4px 12px; font-size: 0.8rem; color: var(--text-light);
+  cursor: pointer; white-space: nowrap; transition: border-color 0.15s, color 0.15s;
+}
+.boss-ultimate-btn:not(:disabled):hover { border-color: #fdcb6e; color: #e17055; }
+.boss-ultimate-btn:disabled { opacity: 0.38; cursor: not-allowed; }
 .boss-progress {
   font-size: 0.85rem; color: var(--text-light); margin-bottom: 8px; text-align: center;
 }
