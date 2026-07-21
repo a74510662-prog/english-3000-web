@@ -3532,13 +3532,18 @@ function finishBossBattle(victory) {
     const ntdLine = given > 0 ? `獲得 💵 新台幣 NT$${given}` : `本週 BOSS 新台幣已達上限`;
     let fragLine;
     if (Math.random() < 0.5) {
-      progress.char.rainbowFragments = (progress.char.rainbowFragments || 0) + 1;
-      if (progress.char.rainbowFragments >= BOSS_RAINBOW_FRAGMENT_REQUIRED) {
+      const rainbowGain = 2 + Math.floor(Math.random() * 4); // 2~5顆
+      progress.char.rainbowFragments = (progress.char.rainbowFragments || 0) + rainbowGain;
+      let ticketsGained = 0;
+      while (progress.char.rainbowFragments >= BOSS_RAINBOW_FRAGMENT_REQUIRED) {
         progress.char.rainbowFragments -= BOSS_RAINBOW_FRAGMENT_REQUIRED;
         progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 1;
-        fragLine = `獲得 🌈 彩虹碎片 ×1 → 集滿自動兌換！彩虹券 +1（目前 🌈${progress.char.rainbowTickets}）`;
+        ticketsGained++;
+      }
+      if (ticketsGained > 0) {
+        fragLine = `獲得 🌈 彩虹碎片 ×${rainbowGain} → 集滿自動兌換！彩虹券 +${ticketsGained}（目前 🌈${progress.char.rainbowTickets}）`;
       } else {
-        fragLine = `獲得 🌈 彩虹碎片 ×1（共 ${progress.char.rainbowFragments}/${BOSS_RAINBOW_FRAGMENT_REQUIRED}）`;
+        fragLine = `獲得 🌈 彩虹碎片 ×${rainbowGain}（共 ${progress.char.rainbowFragments}/${BOSS_RAINBOW_FRAGMENT_REQUIRED}）`;
       }
     } else {
       progress.char.transmutationFragments = (progress.char.transmutationFragments || 0) + 1;
