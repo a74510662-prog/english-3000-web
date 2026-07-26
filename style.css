@@ -825,7 +825,7 @@ body {
 .weapon-item-sub { font-size: 0.75rem; color: var(--text-light); margin-top: 2px; }
 .weapon-item-special { font-size: 0.72rem; color: var(--primary); margin-top: 3px; opacity: 0.85; }
 .weapon-lv-tag { color: var(--accent); font-size: 0.78rem; font-weight: 700; }
-.weapon-item-action { flex-shrink: 0; }
+.weapon-item-action { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .weapon-badge { font-size: 0.72rem; color: var(--accent); font-weight: 700; }
 .weapon-item-locked { opacity: 0.45; background: #f0f0f0; filter: grayscale(60%); pointer-events: none; }
 .weapon-equip-btn {
@@ -834,6 +834,12 @@ body {
   border: none; border-radius: 8px; cursor: pointer;
 }
 .weapon-equip-btn:hover { background: var(--primary-light); }
+.weapon-fragment-btn {
+  font-size: 0.72rem; padding: 4px 10px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+}
+.weapon-fragment-btn:hover { opacity: 0.85; }
 
 .char-avatar-wrap { text-align: center; padding: 16px 0 8px; }
 .char-avatar-big { font-size: 4rem; line-height: 1; cursor: pointer; }

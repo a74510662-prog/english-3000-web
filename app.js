@@ -2293,6 +2293,33 @@ function grantWeaponFragment() {
   return { emoji: wt.emoji, text: `${wt.name} 碎片 ×1${upgradeText}` };
 }
 
+// 使用 1 個通用武器碎片兌換升級指定武器（與一般碎片相同：滿 5 個進度即升 1 級）
+function useUniversalFragment(typeKey) {
+  ensureChar();
+  const frags = progress.char.universalFragments || 0;
+  if (frags <= 0) { alert("通用武器碎片不足！"); return; }
+  if (typeKey === "dragon_sword") { alert("傳說武器不可升階！"); return; }
+  const inv = progress.char.weaponInventory || [];
+  const existing = inv.find(x => x.type === typeKey);
+  if (!existing) return;
+  if ((existing.level || 0) >= 10) { alert("此武器已達最高等級！"); return; }
+  const wt = getWeaponTypeData(typeKey);
+  progress.char.universalFragments = frags - 1;
+  existing.count = (existing.count || 0) + 1;
+  let upgradeText = "";
+  if (existing.count >= 5) {
+    existing.count -= 5;
+    existing.level = (existing.level || 0) + 1;
+    upgradeText = existing.level >= 10
+      ? `<br>🏆 ${wt.name} 達到最高等級 Lv.10！`
+      : `<br>🎉 ${wt.name} 升級！Lv.${existing.level}`;
+  }
+  saveProgress(progress);
+  renderWeaponInventory();
+  renderCharPanel();
+  showChestModal("🔧", `使用 🔧 通用武器碎片 ×1 兌換 ${wt.name}${upgradeText}`);
+}
+
 function buyItem(item, cost) {
   ensureChar();
   // 彩虹券商品
@@ -2654,6 +2681,10 @@ function renderWeaponInventory() {
   const inv = (progress.char && progress.char.weaponInventory) ? progress.char.weaponInventory : [];
   const equipped = (progress.char && progress.char.equippedWeapon) || null;
   const learnedCount = (progress.learnedIds || []).length;
+  const universalFrags = (progress.char && progress.char.universalFragments) || 0;
+
+  const universalDisplay = document.getElementById("weapon-universal-frag-display");
+  if (universalDisplay) universalDisplay.textContent = universalFrags;
 
   // 更新頁首已裝備顯示
   const equippedDisplay = document.getElementById("weapon-equipped-display");
@@ -2689,6 +2720,9 @@ function renderWeaponInventory() {
           ${isEquipped
             ? '<span class="weapon-badge">裝備中</span>'
             : `<button class="weapon-equip-btn" data-type="${wt.key}">裝備</button>`}
+          ${wt.key !== "dragon_sword" && (w.level || 0) < 10
+            ? `<button class="weapon-fragment-btn" data-type="${wt.key}">🔧 兌換升級</button>`
+            : ""}
         </div>`;
       if (!isEquipped) {
         div.querySelector(".weapon-equip-btn").addEventListener("click", () => {
@@ -2704,6 +2738,10 @@ function renderWeaponInventory() {
             }
           }
         });
+      }
+      const fragBtn = div.querySelector(".weapon-fragment-btn");
+      if (fragBtn) {
+        fragBtn.addEventListener("click", () => useUniversalFragment(wt.key));
       }
     } else {
       // 未擁有：鎖定顯示
