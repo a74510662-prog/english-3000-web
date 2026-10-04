@@ -105,6 +105,8 @@
           <div id="timer-bar" class="timer-bar"></div>
         </div>
         <div class="quiz-potion-row">
+          <button class="quiz-potion-btn elixir-btn hidden" data-elixir="hp" data-ctx="quiz">❤️ 生命強化 <span>0</span></button>
+          <button class="quiz-potion-btn elixir-btn hidden" data-elixir="atk" data-ctx="quiz">⚔️ 力量強化 <span>0</span></button>
           <button id="quiz-use-potion-btn" class="quiz-potion-btn" disabled>🧪 藥水 <span id="quiz-potion-count">0</span></button>
         </div>
         <div id="quiz-ultimate-row" class="boss-ultimate-row hidden">
@@ -159,6 +161,8 @@
           </div>
         </div>
         <div class="quiz-potion-row">
+          <button class="quiz-potion-btn elixir-btn hidden" data-elixir="hp" data-ctx="boss">❤️ 生命強化 <span>0</span></button>
+          <button class="quiz-potion-btn elixir-btn hidden" data-elixir="atk" data-ctx="boss">⚔️ 力量強化 <span>0</span></button>
           <button id="boss-use-potion-btn" class="quiz-potion-btn" disabled>🧪 藥水 <span id="boss-potion-count">0</span></button>
         </div>
         <div id="boss-ultimate-row" class="boss-ultimate-row hidden">
@@ -282,6 +286,10 @@
           <span>💵 新台幣（許願用）</span>
           <span id="inv-ntd">NT$0</span>
         </div>
+      </div>
+      <div class="char-inventory-card">
+        <h3>⚗️ 合成工坊</h3>
+        <div id="craft-panel"></div>
       </div>
       <div class="char-class-card">
         <h3>職業</h3>

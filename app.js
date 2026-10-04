@@ -572,6 +572,7 @@ function giveArmorStreakReward() {
 // === 測驗 ===
 function resetQuizSetup() {
   stopQuestionTimer();
+  resetBattleBuff();
   document.getElementById("quiz-setup").classList.remove("hidden");
   document.getElementById("quiz-game").classList.add("hidden");
   document.getElementById("quiz-result").classList.add("hidden");
@@ -1186,6 +1187,7 @@ function nextQuestion() {
 
 function finishQuiz() {
   stopQuestionTimer();
+  resetBattleBuff();
   playVictorySfx();
   const chestEarned = state.quiz.range === "selfStudy"
     ? checkSelfStudyChallenge(state.quiz.mode)
@@ -1519,9 +1521,126 @@ function getMonsterAttack() {
 }
 function getPlayerMaxHp() {
   const level = progress.char?.level || 1;
-  const base = 3 + Math.floor(Math.sqrt(level) * 7.3);
-  return base + getClassHpBonus();
+  const base = 3 + Math.floor(Math.sqrt(level) * 7.3) + getClassHpBonus();
+  return battleBuff.hp ? Math.floor(base * (1 + ELIXIR_BOOST)) : base;
 }
+// === ⚗️ 合成工坊：💎 拼字結晶 + 溢出道具 ===
+// 武器突破：Lv.10 武器（巨龍神劍不需等級）用 🔧 通用碎片 + 💎 突破，每星攻擊 +2，最多 ★5
+const WEAPON_STAR_MAX = 5;
+const WEAPON_STAR_ATK = 2;
+const WEAPON_STAR_COST = [10, 15, 20, 25, 30]; // 第 n 星所需碎片與結晶各幾個
+function getWeaponStarAtk(w) { return (w && w.star ? w.star : 0) * WEAPON_STAR_ATK; }
+function canStarWeapon(w) {
+  return w && (w.star || 0) < WEAPON_STAR_MAX && (w.type === "dragon_sword" || (w.level || 0) >= 10);
+}
+function starUpWeapon(typeKey) {
+  ensureChar();
+  const w = (progress.char.weaponInventory || []).find(x => x.type === typeKey);
+  if (!canStarWeapon(w)) return;
+  const cost = WEAPON_STAR_COST[w.star || 0];
+  const frags = progress.char.universalFragments || 0;
+  const crystals = progress.char.spellCrystals || 0;
+  if (frags < cost || crystals < cost) {
+    alert(`材料不足！突破 ★${(w.star || 0) + 1} 需要 🔧×${cost}＋💎×${cost}\n目前 🔧${frags}・💎${crystals}`);
+    return;
+  }
+  const wt = getWeaponTypeData(typeKey);
+  if (!confirm(`使用 🔧×${cost}＋💎×${cost} 突破 ${wt.name} 至 ★${(w.star || 0) + 1}（攻擊 +${WEAPON_STAR_ATK}）？`)) return;
+  progress.char.universalFragments = frags - cost;
+  progress.char.spellCrystals = crystals - cost;
+  w.star = (w.star || 0) + 1;
+  saveProgress(progress);
+  renderWeaponInventory();
+  renderCharPanel();
+  showChestModal("⭐", `${wt.emoji} ${wt.name} 突破成功！<br><span style="color:#ffd700">${"★".repeat(w.star)}${"☆".repeat(WEAPON_STAR_MAX - w.star)}</span><br>攻擊 +${getWeaponStarAtk(w)}（突破加成）`);
+}
+
+// 強化藥水：🧪×5 + 💎×3 合成，戰鬥中每場限用 1 瓶，該場結束即失效
+const ELIXIR_BOOST = 0.3;
+const ELIXIR_COST = { potions: 5, crystals: 3 };
+const ELIXIRS = {
+  hp:  { key: "elixirHp",  emoji: "❤️", name: "生命強化藥水", desc: "本場最大 HP +30%，並回復增加的 HP" },
+  atk: { key: "elixirAtk", emoji: "⚔️", name: "力量強化藥水", desc: "本場攻擊力 +30%" },
+};
+var battleBuff = { hp: false, atk: false, used: false };
+function resetBattleBuff() { battleBuff = { hp: false, atk: false, used: false }; }
+function applyAtkBuff(atk) { return battleBuff.atk ? Math.max(atk + 1, Math.round(atk * (1 + ELIXIR_BOOST))) : atk; }
+
+function craftElixir(type) {
+  ensureChar();
+  const e = ELIXIRS[type];
+  const potions = progress.char.potions || 0;
+  const crystals = progress.char.spellCrystals || 0;
+  if (potions < ELIXIR_COST.potions || crystals < ELIXIR_COST.crystals) {
+    alert(`材料不足！需要 🧪×${ELIXIR_COST.potions}＋💎×${ELIXIR_COST.crystals}\n目前 🧪${potions}・💎${crystals}`);
+    return;
+  }
+  progress.char.potions = potions - ELIXIR_COST.potions;
+  progress.char.spellCrystals = crystals - ELIXIR_COST.crystals;
+  progress.char[e.key] = (progress.char[e.key] || 0) + 1;
+  saveProgress(progress);
+  renderCharPanel();
+  showChestModal(e.emoji, `合成 ${e.name} ×1！<br><span style="font-size:0.85rem;color:var(--text-light)">${e.desc}・戰鬥中使用</span>`);
+}
+
+function renderCraftPanel() {
+  const el = document.getElementById("craft-panel");
+  if (!el) return;
+  const c = progress.char || {};
+  el.innerHTML = Object.entries(ELIXIRS).map(([type, e]) => `
+    <div class="craft-row">
+      <div class="craft-info"><div class="craft-name">${e.emoji} ${e.name} <span class="craft-own">擁有 ${c[e.key] || 0}</span></div>
+        <div class="craft-desc">${e.desc}・每場限 1 瓶</div></div>
+      <button class="craft-btn" data-elixir="${type}">🧪${ELIXIR_COST.potions}＋💎${ELIXIR_COST.crystals}<br>合成</button>
+    </div>`).join("") +
+    `<div class="craft-note">⭐ 武器突破：到「裝備庫」用 🔧 通用碎片＋💎 突破 Lv.10 武器</div>`;
+  el.querySelectorAll(".craft-btn").forEach(b => b.addEventListener("click", () => craftElixir(b.dataset.elixir)));
+}
+
+// 戰鬥中的強化藥水按鈕（ctx = "quiz" 一般/神龍戰，"boss" 菁英 BOSS 戰）
+function updateElixirBtns() {
+  document.querySelectorAll(".elixir-btn").forEach(b => {
+    const e = ELIXIRS[b.dataset.elixir];
+    const count = (progress.char && progress.char[e.key]) || 0;
+    b.querySelector("span").textContent = count;
+    b.classList.toggle("hidden", count <= 0 && !battleBuff[b.dataset.elixir]);
+    b.disabled = count <= 0 || battleBuff.used;
+    b.classList.toggle("elixir-active", !!battleBuff[b.dataset.elixir]);
+  });
+}
+function useElixir(type, ctx) {
+  ensureChar();
+  const e = ELIXIRS[type];
+  if (battleBuff.used || (progress.char[e.key] || 0) <= 0) return;
+  if (ctx === "boss" && (!bossState || bossState.finished)) return;
+  if (ctx === "quiz" && battleState.playerHp <= 0) return;
+  progress.char[e.key]--;
+  battleBuff.used = true;
+  if (type === "hp") {
+    if (ctx === "boss") {
+      const add = Math.floor(bossState.playerMaxHp * ELIXIR_BOOST);
+      battleBuff.hp = true;
+      bossState.playerMaxHp += add;
+      bossState.playerHp += add;
+      updateBossPlayerHP();
+    } else {
+      const before = getPlayerMaxHp();
+      battleBuff.hp = true;
+      battleState.playerHp += getPlayerMaxHp() - before;
+      updatePlayerHP();
+    }
+  } else {
+    battleBuff.atk = true;
+  }
+  saveProgress(progress);
+  updateElixirBtns();
+  if (ctx === "quiz") showBattleEffect(`${e.emoji} ${e.name}！`, type === "hp" ? "#e84393" : "#e17055");
+  else {
+    const fb = document.getElementById("boss-feedback");
+    if (fb) { fb.textContent = `${e.emoji} 使用 ${e.name}！${type === "hp" ? `最大 HP 提升至 ${bossState.playerMaxHp}` : "本場攻擊力 +30%"}`; fb.className = "boss-feedback boss-fb-correct"; }
+  }
+}
+
 // === 職業系統 ===
 function getClassDef(key) { return CLASSES.find(c => c.key === key) || null; }
 function getEquippedClassKey() { return progress.char?.equippedClass || null; }
@@ -1604,10 +1723,10 @@ function getMagicCloakProbBonus() {
 function getPlayerAttack() {
   const armorAtk = getArmorAttackBonus();
   const classAtk = getClassStatBonus("atk");
-  if (!progress.char || !progress.char.equippedWeapon) return 1 + armorAtk + classAtk;
+  if (!progress.char || !progress.char.equippedWeapon) return applyAtkBuff(1 + armorAtk + classAtk);
   const w = (progress.char.weaponInventory || []).find(x => x.type === progress.char.equippedWeapon);
-  if (!w) return 1 + armorAtk + classAtk;
-  return 1 + (w.attack || 0) + (w.level || 0) + armorAtk + classAtk;
+  if (!w) return applyAtkBuff(1 + armorAtk + classAtk);
+  return applyAtkBuff(1 + (w.attack || 0) + (w.level || 0) + getWeaponStarAtk(w) + armorAtk + classAtk);
 }
 function getClassHpBonus() { return getClassStatBonus("hp"); }
 function getClassDefBonus() { return getClassStatBonus("def"); }
@@ -1645,6 +1764,7 @@ let questionStartTime = null;
 let timerInterval = null;
 
 function initBattle() {
+  resetBattleBuff();
   const mHp = getMonsterMaxHp();
   battleState = { hp: mHp, monsterMaxHp: mHp, monsterIdx: 0, playerHp: getPlayerMaxHp(), sessionMonstersKilled: 0, poisoned: false, poisonDmg: 1, consecutiveCorrect: 0, pendingTimerExtend: 0, dragonShield: 0, armorShield: getEquippedArmorType() === "paradise_cape" ? getArmorLevel() : 0, sorcererBuff: false };
 
@@ -1669,6 +1789,7 @@ function initBattle() {
   updateMonsterHP();
   updatePlayerHP();
   if (state.quiz?.range === "learned") updateLearnedBattleDisplay();
+  updateElixirBtns();
   battleState.energy = 0;
   updateDragonUltimateUI();
 }
@@ -2273,6 +2394,7 @@ function triggerMonsterAttack(overrideDamage) {
 
 function showDefeat() {
   stopQuestionTimer();
+  resetBattleBuff();
   playDefeatSfx();
   checkSessionChallenge(state.quiz.mode);
   document.getElementById("quiz-game").classList.add("hidden");
@@ -3144,7 +3266,7 @@ function renderWeaponInventory() {
     if (eq) {
       const eWt = getWeaponTypeData(eq.type);
       const eLv = eq.level > 0 ? ` Lv.${eq.level}` : "";
-      equippedDisplay.textContent = `${eWt.emoji} ${eWt.name}${eLv} (攻擊 +${eq.attack + (eq.level || 0)})`;
+      equippedDisplay.textContent = `${eWt.emoji} ${eWt.name}${eLv}${eq.star ? " " + "★".repeat(eq.star) : ""} (攻擊 +${eq.attack + (eq.level || 0) + getWeaponStarAtk(eq)})`;
     } else {
       equippedDisplay.textContent = "無";
     }
@@ -3158,13 +3280,14 @@ function renderWeaponInventory() {
 
     if (w) {
       // 已擁有
-      const lvTag = w.level > 0 ? ` <span class="weapon-lv-tag">Lv.${w.level}</span>` : "";
+      const lvTag = (w.level > 0 ? ` <span class="weapon-lv-tag">Lv.${w.level}</span>` : "")
+        + (w.star ? ` <span class="weapon-star-tag">${"★".repeat(w.star)}</span>` : "");
       div.className = "weapon-item" + (isEquipped ? " equipped" : "");
       div.innerHTML = `
         <div class="weapon-item-icon">${wt.emoji}</div>
         <div class="weapon-item-info">
           <div class="weapon-item-name">${wt.name} +${w.attack}${lvTag}</div>
-          <div class="weapon-item-sub">${wt.key === "dragon_sword" ? `傳說武器・不可升階・基礎攻擊 ${w.attack}` : `升級進度 ${w.count}/5・實際傷害 +${w.attack + (w.level || 0)}`}</div>
+          <div class="weapon-item-sub">${wt.key === "dragon_sword" ? `傳說武器・不可升階・基礎攻擊 ${w.attack}${w.star ? `・突破 +${getWeaponStarAtk(w)}` : ""}` : `升級進度 ${w.count}/5・實際傷害 +${w.attack + (w.level || 0) + getWeaponStarAtk(w)}`}</div>
           <div class="weapon-item-special">${getWeaponSpecialDesc(wt, w)}</div>
         </div>
         <div class="weapon-item-action">
@@ -3173,6 +3296,9 @@ function renderWeaponInventory() {
             : `<button class="weapon-equip-btn" data-type="${wt.key}">裝備</button>`}
           ${wt.key !== "dragon_sword" && (w.level || 0) < 10
             ? `<button class="weapon-fragment-btn" data-type="${wt.key}">🔧 兌換升級</button>`
+            : ""}
+          ${canStarWeapon(w)
+            ? `<button class="weapon-star-btn" data-type="${wt.key}">⭐ 突破 ★${(w.star || 0) + 1}<br><small>🔧${WEAPON_STAR_COST[w.star || 0]}＋💎${WEAPON_STAR_COST[w.star || 0]}</small></button>`
             : ""}
         </div>`;
       if (!isEquipped) {
@@ -3190,6 +3316,8 @@ function renderWeaponInventory() {
           }
         });
       }
+      const starBtn = div.querySelector(".weapon-star-btn");
+      if (starBtn) starBtn.addEventListener("click", () => starUpWeapon(wt.key));
       const fragBtn = div.querySelector(".weapon-fragment-btn");
       if (fragBtn) {
         fragBtn.addEventListener("click", () => useUniversalFragment(wt.key));
@@ -3332,6 +3460,7 @@ function renderCharPanel() {
   set("inv-universal-fragments", c.universalFragments || 0);
   set("inv-transmutation-fragments", `${c.transmutationFragments || 0}/24`);
   set("inv-ntd", `NT$${c.ntd || 0}`);
+  renderCraftPanel();
   set("task-en-zh-status", dt.enToZhDone ? "✅" : "⬜");
   set("task-zh-en-status", dt.zhToEnDone ? "✅" : "⬜");
   set("task-challenge-status", dt.challengeDone ? "✅" : "⬜");
@@ -3534,6 +3663,7 @@ document.getElementById("back-to-today").addEventListener("click", () => {
     btn.addEventListener("click", () => openChests(parseInt(btn.dataset.count, 10)));
   });
   document.getElementById("quiz-use-potion-btn").addEventListener("click", usePotion);
+  document.querySelectorAll(".elixir-btn").forEach(b => b.addEventListener("click", () => useElixir(b.dataset.elixir, b.dataset.ctx)));
   document.getElementById("boss-ultimate-btn").addEventListener("click", useUltimate);
   document.getElementById("quiz-ultimate-btn").addEventListener("click", useDragonUltimate);
   document.getElementById("boss-use-potion-btn").addEventListener("click", useBossPotion);
@@ -3692,6 +3822,7 @@ function getBossWeakWordPool() {
 function startBossBattle() {
   if ((progress.learnedIds || []).length < BOSS_UNLOCK_WORDS) return;
   ensureChar();
+  resetBattleBuff();
   const pool = getBossWeakWordPool();
   if (pool.length < 4) {
     alert("熟記字數太少，至少需要 4 個單字才能挑戰！");
@@ -3777,6 +3908,7 @@ function updateBossPlayerHP() {
 }
 
 function updateBossPotionBtn() {
+  updateElixirBtns();
   const btn = document.getElementById("boss-use-potion-btn");
   const countEl = document.getElementById("boss-potion-count");
   if (!btn) return;
@@ -4025,6 +4157,7 @@ function nextBossQuestion() {
 function finishBossBattle(victory) {
   if (!bossState) return;
   bossState.finished = true;
+  resetBattleBuff();
   ensureChar();
   const resultEl = document.getElementById("boss-result");
   const battleEl = document.getElementById("boss-battle-main");
