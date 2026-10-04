@@ -246,7 +246,54 @@ function newProgress() {
     weakWordCounts: {}
   };
 }
-function saveProgress(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
+function saveProgress(p) { ensureSrs(p); localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
+
+// === 間隔複習（SRS）===
+// 每個已熟記的字都有 { box, due, lapses }：box = 連續通過「到期複習」的次數，答錯歸零
+// 通過後間隔 1→2→4→7→15→30→60 天；box 達 SRS_MASTER_BOX 才算「長期記憶」
+const SRS_INTERVALS = [1, 2, 4, 7, 15, 30, 60];
+const SRS_MASTER_BOX = 4;
+function addDaysStr(dateStr, days) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+}
+function ensureSrs(p) {
+  if (!p.srs) p.srs = {};
+  const today = todayDateString();
+  const firstMigration = !p.srsMigrated;
+  (p.learnedIds || []).forEach(id => {
+    if (p.srs[id]) return;
+    // 舊資料第一次轉換：分散到 30 天內，避免同一天爆量
+    const offset = firstMigration ? 1 + (id * 7) % 30 : 1;
+    p.srs[id] = { box: 0, due: addDaysStr(today, offset), lapses: 0 };
+  });
+  p.srsMigrated = true;
+}
+// 記錄一次作答：到期的字答對才升級（提前或同日重複答對不算），答錯一律歸零明天再複習
+function srsRecord(id, correct) {
+  const e = progress.srs && progress.srs[id];
+  if (!e) return;
+  const today = todayDateString();
+  if (correct) {
+    if (e.due > today) return;
+    e.box++;
+    e.due = addDaysStr(today, SRS_INTERVALS[Math.min(e.box, SRS_INTERVALS.length - 1)]);
+  } else {
+    e.box = 0;
+    e.lapses = (e.lapses || 0) + 1;
+    e.due = addDaysStr(today, 1);
+  }
+}
+function getSrsDueIds() {
+  const today = todayDateString();
+  const srs = progress.srs || {};
+  return (progress.learnedIds || []).filter(id => srs[id] && srs[id].due <= today);
+}
+function getSrsMasteredCount() {
+  const srs = progress.srs || {};
+  return (progress.learnedIds || []).filter(id => srs[id] && srs[id].box >= SRS_MASTER_BOX).length;
+}
 let progress = newProgress();
 
 // === 工具 ===
@@ -373,7 +420,15 @@ function updateSelfStudyBtnState() {
   }
 }
 
+function updateReviewQuizBtn() {
+  const btn = document.querySelector('.quiz-range-group button[data-range="learned"] .range-reward');
+  if (!btn) return;
+  const due = getSrsDueIds().length;
+  btn.textContent = due > 0 ? `💰 待複習 ${due}` : "💰";
+}
+
 function updateSelfStudyQuizBtn() {
+  updateReviewQuizBtn();
   ensureDailyTasks();
   const btn = document.getElementById("quiz-range-selfstudy");
   if (!btn) return;
@@ -426,6 +481,7 @@ function renderCard() {
         <div class="hint">「${word.hint}」</div>
         <button class="speak-btn" data-speak="${word.word}">🔊 點我朗讀（慢速）</button>
         <div class="tap-hint">點卡片任意處翻面看中文與例句</div>
+        ${renderWordMemoryStatus(word.id)}
       </div>
       <div class="card-face card-back">
         <div class="level-badge">${word.level}</div>
@@ -437,7 +493,6 @@ function renderCard() {
             <div class="example-zh">${ex.zh}</div>
           </div>
         `).join("")}
-        <button class="learn-btn ${learned ? 'learned' : ''}" id="toggle-learned">${learned ? '✓ 已熟記' : '標記為已熟記'}</button>
       </div>
     </div>
   `;
@@ -454,49 +509,18 @@ function renderCard() {
     state.flipped = !state.flipped;
     card.classList.toggle("flipped");
   });
-  const learnBtn = document.getElementById("toggle-learned");
-  if (learnBtn) {
-    learnBtn.addEventListener("click", e => {
-      e.stopPropagation();
-      toggleLearned(word.id);
-    });
+}
+
+// 熟記不再自己按：完成今日測驗（英譯中＋中譯英全對）或自主學習驗收才算，之後由間隔複習決定記憶強度
+function renderWordMemoryStatus(id) {
+  if (!progress.learnedIds.includes(id)) {
+    return `<div class="memory-status">📖 尚未熟記・<span>今日測驗雙向全對即熟記</span></div>`;
   }
-
-  updateMarkAllBtn();
-}
-
-function toggleLearned(id) {
-  if (progress.learnedIds.includes(id)) {
-    progress.learnedIds = progress.learnedIds.filter(x => x !== id);
-  } else {
-    progress.learnedIds.push(id);
-  }
-  saveProgress(progress);
-  renderCard();
-}
-
-function markAllTodayLearned() {
-  const targets = state.originalTodayWords || state.todayWords.slice(0, 10);
-  if (!targets.length) return;
-  const alreadyAll = targets.every(w => progress.learnedIds.includes(w.id));
-  if (alreadyAll) { alert("今日 10 字已全部標記為熟記。"); return; }
-  if (!confirm(`將今日 ${targets.length} 個單字全部標記為熟記？`)) return;
-  targets.forEach(w => {
-    if (!progress.learnedIds.includes(w.id)) progress.learnedIds.push(w.id);
-  });
-  saveProgress(progress);
-  renderCard();
-  const btn = document.getElementById("mark-all-today");
-  if (btn) { btn.textContent = "✓ 已全部熟記"; btn.disabled = true; }
-}
-
-function updateMarkAllBtn() {
-  const btn = document.getElementById("mark-all-today");
-  if (!btn) return;
-  const targets = state.originalTodayWords || state.todayWords.slice(0, 10);
-  const alreadyAll = targets.length > 0 && targets.every(w => progress.learnedIds.includes(w.id));
-  btn.textContent = alreadyAll ? "✓ 已全部熟記" : "✓ 今日10字全部熟記";
-  btn.disabled = alreadyAll;
+  const e = (progress.srs || {})[id] || { box: 0, due: todayDateString() };
+  const stars = "★".repeat(Math.min(e.box, SRS_MASTER_BOX)) + "☆".repeat(Math.max(0, SRS_MASTER_BOX - e.box));
+  const mastered = e.box >= SRS_MASTER_BOX;
+  const dueText = e.due <= todayDateString() ? "今天該複習" : `${e.due.slice(5).replace("-", "/")} 複習`;
+  return `<div class="memory-status learned">${mastered ? "🧠 長期記憶" : "✓ 已熟記"}　<span class="memory-stars">${stars}</span>・<span>${dueText}</span></div>`;
 }
 
 function updateStreak() {
@@ -558,13 +582,20 @@ function resetQuizSetup() {
 
 function buildLearnedPoolQuestions(count) {
   const learnedSet = new Set(progress.learnedIds || []);
-  const weakSet = new Set((progress.weakWordIds || []).filter(id => learnedSet.has(id)));
+  // 到期複習字優先（最久沒複習的先出），不足再用弱點字/一般字補
+  const srs = progress.srs || {};
+  const dueSet = new Set(getSrsDueIds());
+  const duePool = wordsPool.filter(w => dueSet.has(w.id)).sort((a, b) => srs[a.id].due.localeCompare(srs[b.id].due));
+  const dueSelected = duePool.slice(0, count);
+  const rest = count - dueSelected.length;
+  const usedDue = new Set(dueSelected.map(w => w.id));
+  const weakSet = new Set((progress.weakWordIds || []).filter(id => learnedSet.has(id) && !usedDue.has(id)));
   const weakPool    = shuffle(wordsPool.filter(w => weakSet.has(w.id)));
-  const regularPool = shuffle(wordsPool.filter(w => learnedSet.has(w.id) && !weakSet.has(w.id)));
-  // 弱點字佔最多 60%，剩餘從一般字補齊
-  const weakSlots    = Math.min(Math.ceil(count * 0.6), weakPool.length);
-  const regularSlots = Math.min(count - weakSlots, regularPool.length);
-  let selected = [...weakPool.slice(0, weakSlots), ...regularPool.slice(0, regularSlots)];
+  const regularPool = shuffle(wordsPool.filter(w => learnedSet.has(w.id) && !weakSet.has(w.id) && !usedDue.has(w.id)));
+  // 弱點字佔剩餘名額最多 60%，再從一般字補齊
+  const weakSlots    = Math.min(Math.ceil(rest * 0.6), weakPool.length);
+  const regularSlots = Math.min(rest - weakSlots, regularPool.length);
+  let selected = [...dueSelected, ...weakPool.slice(0, weakSlots), ...regularPool.slice(0, regularSlots)];
   // 若總數不足再補
   if (selected.length < count) {
     const usedIds = new Set(selected.map(w => w.id));
@@ -652,6 +683,7 @@ function renderQuestion() {
     }
   }
   const q = state.quiz.questions[state.quiz.idx];
+  if (state.quiz.range === "all") { renderDragonQuestion(q); return; }
   const distractorPool = state.quiz.pool.length >= 4 ? state.quiz.pool : wordsPool;
   let wrongs = shuffle(distractorPool.filter(w => w.word !== q.word)).slice(0, 3);
   // 術士：連答對 3 題後，下一題消除 lv 個錯誤選項
@@ -700,6 +732,109 @@ function renderQuestion() {
   startQuestionTimer();
 }
 
+// === 神龍討伐戰：聽力題（聽發音選意思）＋ 填空題（例句挖空，拼出單字）===
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// 從例句找出要挖空的字：先找原形，再找變化形（複數、過去式、-ing…），找不到回傳 null
+function buildCloze(q) {
+  const base = q.word.toLowerCase();
+  if (/[^a-z']/.test(base)) return null;
+  const stem = base.replace(/e$/, "");
+  const tryMatch = test => {
+    for (const ex of q.examples || []) {
+      const m = (ex.en.match(/[A-Za-z']+/g) || []).find(t => test(t.toLowerCase()));
+      if (m) return { ex, answer: m };
+    }
+    return null;
+  };
+  return tryMatch(t => t === base)
+    || tryMatch(t => t.startsWith(stem) && t.length >= base.length && t.length - base.length <= 3);
+}
+
+function renderDragonQuestion(q) {
+  document.getElementById("q-current").textContent = state.quiz.idx + 1;
+  document.getElementById("q-total").textContent = state.quiz.questions.length;
+  document.getElementById("q-correct").textContent = state.quiz.correct;
+  const qEl = document.getElementById("quiz-question");
+  const opts = document.getElementById("quiz-options");
+  opts.innerHTML = "";
+  // 術士：連答對 3 題後，下一題獲得魔法提示（聽力消除選項／填空多顯示字母）
+  let sorcererLv = 0;
+  if (getEquippedClassKey() === "sorcerer" && battleState.sorcererBuff) {
+    battleState.sorcererBuff = false;
+    sorcererLv = Math.max(1, getEquippedClassLevel());
+  }
+  const cloze = Math.random() < 0.5 ? buildCloze(q) : null;
+  state.quiz.dragonQ = cloze ? { type: "cloze", answer: cloze.answer, sentence: cloze.ex.en } : { type: "listen" };
+
+  if (cloze) {
+    const ans = cloze.answer;
+    const reveal = Math.max(1, Math.min(ans.length - 1, 1 + sorcererLv));
+    if (sorcererLv) showBattleEffect(`🪄魔法提示 +${reveal - 1} 字母`, "#a29bfe");
+    const hint = ans.slice(0, reveal) + " _".repeat(ans.length - reveal);
+    const idx = cloze.ex.en.indexOf(ans);
+    const sentence = escapeHtml(cloze.ex.en.slice(0, idx)) + `<span class="cloze-blank">${escapeHtml(hint)}</span>` + escapeHtml(cloze.ex.en.slice(idx + ans.length));
+    qEl.innerHTML = `<div class="dragon-qtype">✏️ 填空題：依句意拼出單字（${ans.length} 個字母）</div>
+      <div class="cloze-sentence">${sentence}</div>
+      <div class="cloze-zh">${escapeHtml(cloze.ex.zh)}</div>`;
+    const row = document.createElement("div");
+    row.className = "cloze-input-row";
+    row.innerHTML = `<input type="text" id="cloze-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="輸入單字"><button id="cloze-submit">送出</button>`;
+    opts.appendChild(row);
+    const input = row.querySelector("input");
+    const submit = () => {
+      if (input.disabled || !input.value.trim()) return;
+      const ok = input.value.trim().toLowerCase() === ans.toLowerCase();
+      input.disabled = true;
+      input.classList.add(ok ? "correct" : "wrong");
+      answerQuestion(null, ok, q);
+    };
+    row.querySelector("button").addEventListener("click", submit);
+    input.addEventListener("keydown", e => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      submit();
+    });
+    setTimeout(() => input.focus(), 50);
+  } else {
+    qEl.innerHTML = `<div class="dragon-qtype">🎧 聽力題：聽發音，選出正確意思</div>`;
+    const btns = document.createElement("div");
+    btns.className = "dragon-listen-btns";
+    btns.innerHTML = `<button>🔊 再聽一次</button><button>🐢 慢速</button>`;
+    btns.children[0].addEventListener("click", e => { e.stopPropagation(); speak(q.word, 0.9); });
+    btns.children[1].addEventListener("click", e => { e.stopPropagation(); speak(q.word, 0.5); });
+    qEl.appendChild(btns);
+    let wrongs = shuffle(wordsPool.filter(w => w.meaning !== q.meaning)).slice(0, 3);
+    if (sorcererLv) {
+      const removeCount = Math.min(sorcererLv, wrongs.length);
+      wrongs = wrongs.slice(0, wrongs.length - removeCount);
+      showBattleEffect(`🪄魔法消除${removeCount}個選項`, "#a29bfe");
+    }
+    shuffle([q, ...wrongs]).forEach(opt => {
+      const b = document.createElement("button");
+      b.textContent = opt.meaning;
+      b.addEventListener("click", () => answerQuestion(b, opt.id === q.id, q));
+      opts.appendChild(b);
+    });
+    setTimeout(() => speak(q.word, 0.9), 300);
+  }
+
+  document.getElementById("quiz-feedback").classList.add("hidden");
+  document.getElementById("next-question").classList.add("hidden");
+  startQuestionTimer();
+}
+
+// 答錯時顯示的正解文字
+function getQuizAnswerText(q) {
+  if (state.quiz.range === "all") {
+    const dq = state.quiz.dragonQ || {};
+    return dq.type === "cloze" ? `${dq.answer}（${q.meaning}）` : `${q.word}（${q.meaning}）`;
+  }
+  return state.quiz.mode === "en-to-zh" ? q.meaning : q.word;
+}
+
 function answerQuestion(btn, isCorrect, q) {
   const elapsed = questionStartTime ? Date.now() - questionStartTime : 99999;
   const weaponItem = getEquippedWeaponItem();
@@ -712,9 +847,11 @@ function answerQuestion(btn, isCorrect, q) {
 
   document.querySelectorAll("#quiz-options button").forEach(b => {
     b.disabled = true;
-    if (b.textContent === (state.quiz.mode === "en-to-zh" ? q.meaning : q.word)) b.classList.add("correct");
+    const correctText = (state.quiz.range === "all" || state.quiz.mode === "en-to-zh") ? q.meaning : q.word;
+    if (b.textContent === correctText) b.classList.add("correct");
   });
-  if (!isCorrect) btn.classList.add("wrong");
+  if (!isCorrect && btn) btn.classList.add("wrong");
+  srsRecord(q.id, isCorrect);
   const fb = document.getElementById("quiz-feedback");
   if (isCorrect) {
     state.quiz.correct++;
@@ -774,6 +911,7 @@ function answerQuestion(btn, isCorrect, q) {
       }
     }
     fb.textContent = isCritical ? (fireCrit ? "🔥 燃燒爆擊！答對了！" : "⚡ 爆擊！答對了！") : "✓ 答對了!";
+    if (state.quiz.range === "all") fb.textContent += `　${q.word}：${q.meaning}`;
     fb.className = "quiz-feedback ok";
     triggerAttack(isCritical);
   } else {
@@ -787,7 +925,7 @@ function answerQuestion(btn, isCorrect, q) {
       if (!progress.weakWordIds.includes(q.id)) progress.weakWordIds.push(q.id);
       progress.weakWordCounts[q.id] = 0;
     }
-    fb.textContent = `✗ 答錯了。正解：${state.quiz.mode === "en-to-zh" ? q.meaning : q.word}`;
+    fb.textContent = `✗ 答錯了。正解：${getQuizAnswerText(q)}`;
     fb.className = "quiz-feedback no";
     if (state.quiz.range !== "learned") {
       triggerMonsterAttack(state.quiz.range === "all" ? getDragonDamage() : undefined);
@@ -807,6 +945,11 @@ function answerQuestion(btn, isCorrect, q) {
         }
       }, 700);
     }
+  }
+  // 神龍討伐戰：作答後朗讀（填空題念完整例句）
+  if (state.quiz.range === "all") {
+    const dq = state.quiz.dragonQ || {};
+    setTimeout(() => speak(dq.type === "cloze" ? dq.sentence : q.word, 0.8), 400);
   }
   saveProgress(progress);
   fb.classList.remove("hidden");
@@ -971,6 +1114,8 @@ function renderProgress() {
   document.getElementById("stat-days").textContent = completedDays;
   document.getElementById("stat-words").textContent = learned;
   document.getElementById("stat-percent").textContent = pctOfTarget + "%";
+  document.getElementById("stat-mastered").textContent = getSrsMasteredCount();
+  document.getElementById("stat-due").textContent = getSrsDueIds().length;
   document.getElementById("progress-current").textContent = learned;
   document.getElementById("progress-total").textContent = TOTAL_TARGET;
   document.getElementById("progress-fill").style.width = pctOfTarget + "%";
@@ -1156,6 +1301,7 @@ function getWeaponTypeData(key) {
 }
 const CRITICAL_MS = 10000;
 function getCriticalMs() {
+  if (state.quiz && state.quiz.range === "all" && state.quiz.dragonQ?.type === "cloze") return 20000;
   return (state.quiz && state.quiz.range === "learned") ? 5000 : CRITICAL_MS;
 }
 
@@ -3066,6 +3212,7 @@ document.getElementById("back-to-today").addEventListener("click", () => {
       document.querySelectorAll(".quiz-range-group button").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
       state.quiz.range = b.dataset.range;
+      if (state.quiz.range === "all") state.quiz.mode = "dragon";
       tryStartQuiz();
     });
   });
@@ -3074,7 +3221,6 @@ document.getElementById("back-to-today").addEventListener("click", () => {
   document.getElementById("defeat-restart").addEventListener("click", resetQuizSetup);
 
   document.getElementById("word-search").addEventListener("input", e => searchWords(e.target.value));
-  document.getElementById("mark-all-today").addEventListener("click", markAllTodayLearned);
   document.querySelectorAll(".chest-qty-btn").forEach(btn => {
     btn.addEventListener("click", () => openChests(parseInt(btn.dataset.count, 10)));
   });
@@ -3371,6 +3517,7 @@ function renderBossQuestion() {
 
 function answerBossQuestion(correct, q) {
   if (!bossState) return;
+  srsRecord(q.id, correct);
   const optEl = document.getElementById("boss-options");
   if (optEl) optEl.querySelectorAll(".boss-option-btn").forEach(b => b.disabled = true);
   const fb = document.getElementById("boss-feedback");

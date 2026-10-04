@@ -59,9 +59,6 @@
         <button id="flip-card">翻面</button>
         <button id="next-card">下一個</button>
       </div>
-      <div style="text-align:center;margin-top:10px">
-        <button id="mark-all-today" class="learn-btn" style="font-size:0.9rem;padding:6px 18px">✓ 今日10字全部熟記</button>
-      </div>
     </section>
 
     <!-- 測驗頁 -->
@@ -76,8 +73,8 @@
         <h3>測驗範圍</h3>
         <div class="quiz-range-group">
           <button data-range="today">僅今日 10 字 <span class="range-reward">📦</span></button>
-          <button data-range="learned">全部已熟記 <span class="range-reward">💰</span></button>
-          <button data-range="all">全字池隨機 <span class="range-reward">🌈</span></button>
+          <button data-range="learned">複習已熟記 <span class="range-reward">💰</span></button>
+          <button data-range="all">🐉 神龍討伐戰 <span class="range-reward">聽力＋填空 🌈</span></button>
           <button data-range="selfStudy" id="quiz-range-selfstudy" disabled>自主學習測驗 <span class="range-reward">0字</span></button>
         </div>
       </div>
@@ -189,6 +186,14 @@
         <div class="stat-card">
           <div class="stat-num" id="stat-percent">0%</div>
           <div class="stat-label">總進度</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-mastered">0</div>
+          <div class="stat-label">🧠 長期記憶字數</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-due">0</div>
+          <div class="stat-label">📅 今日待複習</div>
         </div>
       </div>
       <div class="progress-bar-wrap">
