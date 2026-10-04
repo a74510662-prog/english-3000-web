@@ -1081,12 +1081,13 @@ function finishQuiz() {
     }
   } else if (state.quiz.range === "all") {
     if (state.quiz.correct === total) {
-      ensureChar();
-      progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 1;
+      const ticketsGained = addRainbowFragments(1);
       saveProgress(progress);
-      chestLine += `<br><span style="color:#a29bfe;font-size:0.95rem">🌈 25 題全對！獲得彩虹券 ×1（目前 ${progress.char.rainbowTickets} 張）</span>`;
+      chestLine += ticketsGained > 0
+        ? `<br><span style="color:#a29bfe;font-size:0.95rem">🌈 25 題全對！彩虹碎片 ×1 → 集滿兌換彩虹券 +${ticketsGained}（目前 🌈${progress.char.rainbowTickets}）</span>`
+        : `<br><span style="color:#a29bfe;font-size:0.95rem">🌈 25 題全對！獲得彩虹碎片 ×1（${progress.char.rainbowFragments}/${BOSS_RAINBOW_FRAGMENT_REQUIRED}）</span>`;
     } else {
-      chestLine += `<br><span style="color:var(--text-light);font-size:0.9rem">答對 ${state.quiz.correct}/${total} 題，25 題全對可獲得 🌈 彩虹券</span>`;
+      chestLine += `<br><span style="color:var(--text-light);font-size:0.9rem">答對 ${state.quiz.correct}/${total} 題，25 題全對可獲得 🌈 彩虹碎片</span>`;
     }
   } else if (chestEarned) {
     chestLine += `<br><span style="color:#f4a261;font-size:0.95rem">📦 任務達成！獲得寶箱 ×1（本場全對！）</span>`;
@@ -2347,6 +2348,88 @@ function claimWelcomeReward() {
   showChestModal("🎁", `初次學習獎勵！<br>獲得 📦 寶箱 ×100<br><span style="font-size:0.85rem;color:var(--text-light)">前往角色頁開啟寶箱</span>`);
 }
 
+// 🐉 屠龍者英雄：神龍討伐戰累計擊殺巨龍數，一次性領取彩虹券
+const DRAGON_SLAYER_TIERS = [
+  { id: "d1",   kills: 1,   title: "初次屠龍",     tickets: 5 },
+  { id: "d10",  kills: 10,  title: "屠龍見習",     tickets: 10 },
+  { id: "d30",  kills: 30,  title: "屠龍者",       tickets: 20 },
+  { id: "d50",  kills: 50,  title: "屠龍勇士",     tickets: 20 },
+  { id: "d80",  kills: 80,  title: "屠龍騎士",     tickets: 25 },
+  { id: "d120", kills: 120, title: "屠龍英雄",     tickets: 25 },
+  { id: "d170", kills: 170, title: "龍族剋星",     tickets: 30 },
+  { id: "d230", kills: 230, title: "龍之噩夢",     tickets: 30 },
+  { id: "d300", kills: 300, title: "弒神屠龍者",   tickets: 35 },
+  { id: "d400", kills: 400, title: "傳說屠龍英雄", tickets: 50 },
+];
+
+function getNextDragonTierText(kills) {
+  const next = DRAGON_SLAYER_TIERS.find(t => t.kills > kills);
+  return next ? `再討伐 ${next.kills - kills} 隻達成「${next.title}」（🌈×${next.tickets}）` : "已達成全部屠龍成就！";
+}
+
+// 彩虹碎片：集滿 BOSS_RAINBOW_FRAGMENT_REQUIRED 顆自動兌換 1 張彩虹券，回傳兌換張數
+function addRainbowFragments(amount) {
+  ensureChar();
+  progress.char.rainbowFragments = (progress.char.rainbowFragments || 0) + amount;
+  let ticketsGained = 0;
+  while (progress.char.rainbowFragments >= BOSS_RAINBOW_FRAGMENT_REQUIRED) {
+    progress.char.rainbowFragments -= BOSS_RAINBOW_FRAGMENT_REQUIRED;
+    progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 1;
+    ticketsGained++;
+  }
+  return ticketsGained;
+}
+
+function claimDragonSlayer(tierId) {
+  const t = DRAGON_SLAYER_TIERS.find(x => x.id === tierId);
+  if (!t) return;
+  ensureChar();
+  if ((progress.char.dragonKills || 0) < t.kills) return;
+  if (!progress.char.dragonSlayerClaimed) progress.char.dragonSlayerClaimed = {};
+  if (progress.char.dragonSlayerClaimed[tierId]) return;
+  progress.char.dragonSlayerClaimed[tierId] = true;
+  progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + t.tickets;
+  saveProgress(progress);
+  renderAchievements();
+  renderCharPanel();
+  showChestModal("🐉", `🏆 ${t.title}<br>獲得 🌈 彩虹券 ×${t.tickets}<br><span style="font-size:0.85rem;color:var(--text-light)">目前 🌈${progress.char.rainbowTickets}</span>`);
+}
+
+function renderDragonSlayerAchievements() {
+  const listEl = document.getElementById("achievement-dragon-list");
+  if (!listEl) return;
+  const kills = progress.char.dragonKills || 0;
+  const claimedMap = progress.char.dragonSlayerClaimed || {};
+  listEl.innerHTML = "";
+  const counter = document.createElement("div");
+  counter.className = "ach-clear-counter";
+  counter.textContent = `神龍討伐戰累計擊殺巨龍：${kills} 隻`;
+  listEl.appendChild(counter);
+  DRAGON_SLAYER_TIERS.forEach(t => {
+    const claimed = !!claimedMap[t.id];
+    const eligible = kills >= t.kills;
+    const card = document.createElement("div");
+    card.className = "ach-card" + (claimed ? " ach-claimed" : "");
+    const actionHtml = claimed
+      ? '<span class="ach-done">✅ 已領取</span>'
+      : eligible
+        ? '<button class="ach-claim-btn">領取</button>'
+        : `<span class="ach-locked">${kills}/${t.kills} 隻</span>`;
+    card.innerHTML =
+      `<div class="ach-icon">${eligible ? "🐉" : "🔒"}</div>` +
+      '<div class="ach-info">' +
+        `<div class="ach-title">${t.title}</div>` +
+        `<div class="ach-desc">討伐巨龍 ${t.kills} 隻・🌈 彩虹券 ×${t.tickets}</div>` +
+        `<div class="ach-progress">${Math.min(kills, t.kills)} / ${t.kills} 隻</div>` +
+      '</div>' +
+      `<div class="ach-action">${actionHtml}</div>`;
+    if (!claimed && eligible) {
+      card.querySelector(".ach-claim-btn").addEventListener("click", () => claimDragonSlayer(t.id));
+    }
+    listEl.appendChild(card);
+  });
+}
+
 function claimMilestoneArmor(milestoneId) {
   const m = WORD_MILESTONES.find(x => x.id === milestoneId);
   if (!m) return;
@@ -2377,6 +2460,7 @@ function claimMilestoneArmor(milestoneId) {
 
 function renderAchievements() {
   ensureChar();
+  renderDragonSlayerAchievements();
   const learnedClears = progress.learnedModeClears || 0;
 
   // 歡迎獎勵
@@ -2783,14 +2867,18 @@ function onMonsterKilled() {
     }
     return;
   }
-  // 全字池模式：擊殺巨龍獎勵 100 張彩虹券
+  // 神龍討伐戰：擊殺巨龍累計討伐數，獎勵改由「屠龍者英雄」成就一次性領取
   if (state.quiz && state.quiz.range === "all") {
     ensureChar();
-    progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 10;
+    progress.char.dragonKills = (progress.char.dragonKills || 0) + 1;
     saveProgress(progress);
-    showBattleEffect("🌈+10", "#a29bfe");
+    const kills = progress.char.dragonKills;
+    showBattleEffect(`🐉討伐 ${kills} 隻`, "#ffd700");
+    const reached = DRAGON_SLAYER_TIERS.find(t => t.kills === kills);
     setTimeout(() => {
-      showChestModal("🐉", `討伐巨龍成功！<br>獲得 🌈 彩虹券 ×10<br><span style="font-size:0.85rem;color:#ffd700">傳說成就解鎖！</span>`);
+      showChestModal("🐉", reached
+        ? `討伐巨龍成功！累計 ${kills} 隻<br>🏆 達成成就「${reached.title}」<br><span style="font-size:0.85rem;color:#ffd700">前往成就頁領取 🌈 彩虹券 ×${reached.tickets}</span>`
+        : `討伐巨龍成功！累計 ${kills} 隻<br><span style="font-size:0.85rem;color:var(--text-light)">${getNextDragonTierText(kills)}</span>`);
     }, 1000);
     return;
   }
@@ -3790,13 +3878,7 @@ function finishBossBattle(victory) {
     let fragLine;
     if (Math.random() < 0.5) {
       const rainbowGain = 2 + Math.floor(Math.random() * 4); // 2~5顆
-      progress.char.rainbowFragments = (progress.char.rainbowFragments || 0) + rainbowGain;
-      let ticketsGained = 0;
-      while (progress.char.rainbowFragments >= BOSS_RAINBOW_FRAGMENT_REQUIRED) {
-        progress.char.rainbowFragments -= BOSS_RAINBOW_FRAGMENT_REQUIRED;
-        progress.char.rainbowTickets = (progress.char.rainbowTickets || 0) + 1;
-        ticketsGained++;
-      }
+      const ticketsGained = addRainbowFragments(rainbowGain);
       if (ticketsGained > 0) {
         fragLine = `獲得 🌈 彩虹碎片 ×${rainbowGain} → 集滿自動兌換！彩虹券 +${ticketsGained}（目前 🌈${progress.char.rainbowTickets}）`;
       } else {
