@@ -1012,6 +1012,7 @@ function answerQuestion(btn, isCorrect, q) {
     state.quiz.correct++;
     progress.quizCorrect++;
     battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
+    petOnCorrect("quiz");
     if (state.quiz.range === "all") {
       battleState.energy = Math.min(100, (battleState.energy || 0) + (battleState.consecutiveCorrect >= 2 ? 20 : 10));
       updateDragonUltimateUI();
@@ -1343,7 +1344,17 @@ function setMonsterChar(el, monster) {
     el.innerHTML = `<img src="${monster.img}" class="monster-img" alt="怪物">`;
   }
 }
-const AVATARS = ["🧙","🧝","🦸","🧜","🧚","🧞","🦊","🐱","🐶","🐼","🦁","🐯","🐸","🐧","🐺","🦅"];
+const AVATARS = ["img:haohao","🧙","🧝","🦸","🧜","🧚","🧞","🦊","🐱","🐶","🐼","🦁","🐯","🐸","🐧","🐺","🦅"];
+// 圖片頭像：avatar 存成 "img:<key>"
+const AVATAR_IMAGES = { haohao: "images/avatar-haohao.png" };
+function avatarHtml(a) {
+  a = a || "🧙";
+  if (a.startsWith("img:") && AVATAR_IMAGES[a.slice(4)]) return `<img src="${AVATAR_IMAGES[a.slice(4)]}" class="avatar-img" alt="角色">`;
+  return a;
+}
+function setAvatarEl(el) {
+  if (el) el.innerHTML = avatarHtml(progress.char?.avatar);
+}
 const ARMORS = [
   { key: "paradise_cape", name: "樂園披風", emoji: "🌸", desc: "單場次抵禦怪物攻擊一次" },
   { key: "dragon_coat",   name: "龍紋外套", emoji: "🐲", desc: "攻擊力+1、防禦+1（每次傷害減少1）" },
@@ -1641,6 +1652,185 @@ function useElixir(type, ctx) {
   }
 }
 
+// === 🐾 寵物夥伴：🔧 通用武器碎片 + 💎 拼字結晶召喚，💎 升級，選一隻陪同出戰 ===
+const PET_MAX_LV = 10;
+const PET_SUMMON_COST = { frags: 10, crystals: 20 };
+function getPetUpgradeCost(lv) { return lv * 5; } // Lv.n → n+1 需要 💎 n×5
+const PETS = [
+  { key: "shadow_cat",  name: "暗影魔喵",   img: "images/pets/shadow-cat.png",  role: "攻擊型",
+    assist: lv => 0.25 + lv * 0.05,
+    desc: lv => `每次答對追擊 ${Math.round((0.25 + lv * 0.05) * 100)}% 攻擊力` },
+  { key: "meteor",      name: "隕石小怪",   img: "images/pets/meteor.png",      role: "爆擊型",
+    assist: (lv, crit) => crit ? 0.5 + lv * 0.1 : 0.1,
+    desc: lv => `爆擊時追擊 ${Math.round((0.5 + lv * 0.1) * 100)}% 攻擊力（平時 10%）` },
+  { key: "rag_bear",    name: "破布熊",     img: "images/pets/rag-bear.png",    role: "守護型",
+    assist: () => 0.1, block: lv => 1 + Math.floor(lv / 2),
+    desc: lv => `受到攻擊時替你擋下 ${1 + Math.floor(lv / 2)} 點傷害・追擊 10%` },
+  { key: "patch_bear",  name: "拼布熊熊",   img: "images/pets/patch-bear.png",  role: "治療型",
+    assist: () => 0.1, heal: lv => 1 + lv,
+    desc: lv => `每答對 3 題回復 ${1 + lv} HP・追擊 10%` },
+  { key: "lolli_bunny", name: "棒棒糖兔兔", img: "images/pets/lolli-bunny.png", role: "能量型",
+    assist: () => 0.15, energy: lv => 3 + lv,
+    desc: lv => `答對額外 +${3 + lv} 絕招能量（神龍／菁英 BOSS）・追擊 15%` },
+];
+function getPetDef(key) { return PETS.find(p => p.key === key) || null; }
+function getActivePet() {
+  const key = progress.char?.activePet;
+  const data = key && progress.char.pets?.[key];
+  const def = getPetDef(key);
+  return data && def ? { def, lv: data.lv || 1 } : null;
+}
+
+function renderBattlePet(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const pet = getActivePet();
+  if (!pet) { el.classList.add("hidden"); return; }
+  el.src = pet.def.img;
+  el.alt = pet.def.name;
+  el.classList.remove("hidden");
+}
+function petHop(arenaId) {
+  const el = document.getElementById(arenaId === "boss-arena" ? "boss-pet" : "player-pet");
+  if (!el) return;
+  el.classList.remove("pet-attack");
+  void el.offsetWidth;
+  el.classList.add("pet-attack");
+}
+
+// 寵物追擊：回傳追擊傷害（0 = 沒有追擊），並顯示特效
+function petAssist(isCritical, arenaId) {
+  const pet = getActivePet();
+  if (!pet) return 0;
+  const pct = pet.def.assist(pet.lv, isCritical);
+  const dmg = Math.max(1, Math.round(getPlayerAttack() * pct));
+  petHop(arenaId);
+  setTimeout(() => showDamageNumber(dmg, false, "#fd79a8", arenaId), 250);
+  return dmg;
+}
+// 守護型：減少受到的傷害
+function petBlock(dmg, arenaId) {
+  const pet = getActivePet();
+  if (!pet || !pet.def.block || dmg <= 0) return dmg;
+  const blocked = Math.min(dmg, pet.def.block(pet.lv));
+  petHop(arenaId);
+  if (arenaId === "boss-arena") {
+    const fb = document.getElementById("boss-feedback");
+    if (fb) setTimeout(() => { fb.textContent += `（🧸${pet.def.name}擋下 ${blocked}）`; }, 50);
+  } else {
+    showBattleEffect(`🧸擋下 ${blocked}`, "#a1887f");
+  }
+  return dmg - blocked;
+}
+// 答對時：治療型回血、能量型加絕招能量
+function petOnCorrect(ctx) {
+  const pet = getActivePet();
+  if (!pet) return;
+  const st = ctx === "boss" ? bossState : battleState;
+  if (!st) return;
+  if (pet.def.heal) {
+    st.petCorrect = (st.petCorrect || 0) + 1;
+    if (st.petCorrect % 3 === 0) {
+      const amount = pet.def.heal(pet.lv);
+      if (ctx === "boss") {
+        bossState.playerHp = Math.min(bossState.playerMaxHp, bossState.playerHp + amount);
+        updateBossPlayerHP();
+      } else {
+        healPlayer(amount);
+        showBattleEffect(`🧵${pet.def.name} +${amount}HP`, "#e17055");
+      }
+      petHop(ctx === "boss" ? "boss-arena" : "battle-arena");
+    }
+  }
+  if (pet.def.energy) {
+    const add = pet.def.energy(pet.lv);
+    if (ctx === "boss") {
+      bossState.energy = Math.min(100, (bossState.energy || 0) + add);
+      updateBossUltimateUI();
+    } else if (state.quiz?.range === "all") {
+      battleState.energy = Math.min(100, (battleState.energy || 0) + add);
+      updateDragonUltimateUI();
+    }
+  }
+}
+
+function summonPet(key) {
+  ensureChar();
+  const def = getPetDef(key);
+  if (!def) return;
+  if (!progress.char.pets) progress.char.pets = {};
+  if (progress.char.pets[key]) return;
+  const frags = progress.char.universalFragments || 0;
+  const crystals = progress.char.spellCrystals || 0;
+  if (frags < PET_SUMMON_COST.frags || crystals < PET_SUMMON_COST.crystals) {
+    alert(`材料不足！召喚需要 🔧×${PET_SUMMON_COST.frags}＋💎×${PET_SUMMON_COST.crystals}\n目前 🔧${frags}・💎${crystals}`);
+    return;
+  }
+  progress.char.universalFragments = frags - PET_SUMMON_COST.frags;
+  progress.char.spellCrystals = crystals - PET_SUMMON_COST.crystals;
+  progress.char.pets[key] = { lv: 1 };
+  if (!progress.char.activePet) progress.char.activePet = key;
+  saveProgress(progress);
+  renderCharPanel();
+  showChestModal(`<img src="${def.img}" class="pet-modal-img" alt="">`, `🐾 召喚成功！<br><strong>${def.name}</strong>（${def.role}）<br><span style="font-size:0.85rem;color:var(--text-light)">${def.desc(1)}</span>`);
+}
+function upgradePet(key) {
+  ensureChar();
+  const def = getPetDef(key);
+  const data = progress.char.pets?.[key];
+  if (!def || !data || data.lv >= PET_MAX_LV) return;
+  const cost = getPetUpgradeCost(data.lv);
+  const crystals = progress.char.spellCrystals || 0;
+  if (crystals < cost) { alert(`💎 拼字結晶不足！升級需要 💎×${cost}，目前 💎${crystals}`); return; }
+  progress.char.spellCrystals = crystals - cost;
+  data.lv++;
+  saveProgress(progress);
+  renderCharPanel();
+  showChestModal(`<img src="${def.img}" class="pet-modal-img" alt="">`, `${def.name} 升級！Lv.${data.lv}<br><span style="font-size:0.85rem;color:var(--text-light)">${def.desc(data.lv)}</span>`);
+}
+function setActivePet(key) {
+  ensureChar();
+  if (!progress.char.pets?.[key]) return;
+  progress.char.activePet = key;
+  saveProgress(progress);
+  renderCharPanel();
+}
+
+function renderPetPanel() {
+  const el = document.getElementById("pet-panel");
+  if (!el) return;
+  const c = progress.char || {};
+  const pets = c.pets || {};
+  el.innerHTML = PETS.map(def => {
+    const data = pets[def.key];
+    const active = c.activePet === def.key;
+    let actions;
+    if (!data) {
+      actions = `<button class="pet-btn pet-summon" data-act="summon" data-pet="${def.key}">召喚<br><small>🔧${PET_SUMMON_COST.frags}＋💎${PET_SUMMON_COST.crystals}</small></button>`;
+    } else {
+      actions = (active ? `<span class="pet-active-badge">出戰中</span>` : `<button class="pet-btn" data-act="active" data-pet="${def.key}">出戰</button>`)
+        + (data.lv < PET_MAX_LV
+          ? `<button class="pet-btn pet-up" data-act="up" data-pet="${def.key}">升級<br><small>💎${getPetUpgradeCost(data.lv)}</small></button>`
+          : `<span class="pet-max">MAX</span>`);
+    }
+    const lv = data ? data.lv : 1;
+    return `<div class="pet-card${data ? "" : " pet-locked"}${active ? " pet-card-active" : ""}">
+      <img src="${def.img}" class="pet-img" alt="${def.name}">
+      <div class="pet-info">
+        <div class="pet-name">${def.name} <span class="pet-role">${def.role}</span>${data ? ` <span class="pet-lv">Lv.${data.lv}</span>` : ""}</div>
+        <div class="pet-desc">${def.desc(lv)}</div>
+      </div>
+      <div class="pet-actions">${actions}</div>
+    </div>`;
+  }).join("");
+  el.querySelectorAll(".pet-btn").forEach(b => b.addEventListener("click", () => {
+    const { act, pet } = b.dataset;
+    if (act === "summon") summonPet(pet);
+    else if (act === "up") upgradePet(pet);
+    else setActivePet(pet);
+  }));
+}
+
 // === 職業系統 ===
 function getClassDef(key) { return CLASSES.find(c => c.key === key) || null; }
 function getEquippedClassKey() { return progress.char?.equippedClass || null; }
@@ -1785,7 +1975,8 @@ function initBattle() {
     setMonsterChar(mChar, initialMonster);
   }
   const pChar = document.getElementById("player-char");
-  if (pChar) { pChar.textContent = progress.char?.avatar || "🧙"; pChar.className = "battle-char"; }
+  if (pChar) { setAvatarEl(pChar); pChar.className = "battle-char"; }
+  renderBattlePet("player-pet");
   updateMonsterHP();
   updatePlayerHP();
   if (state.quiz?.range === "learned") updateLearnedBattleDisplay();
@@ -2303,6 +2494,7 @@ function triggerAttack(isCritical) {
     void monsterEl.offsetWidth;
     monsterEl.classList.add("hit");
     battleState.hp -= dmg;
+    battleState.hp -= petAssist(isCritical, "battle-arena");
     if (state.quiz?.range === "learned") {
       battleState.lmBoss.hp = Math.max(0, battleState.hp);
       progress.lmBossHp = battleState.lmBoss.hp;
@@ -2360,6 +2552,7 @@ function triggerMonsterAttack(overrideDamage) {
     void playerEl.offsetWidth;
     playerEl.classList.add("player-hit");
     let monsterDmg = overrideDamage !== undefined ? overrideDamage : getMonsterAttack();
+    monsterDmg = petBlock(monsterDmg, "battle-arena");
     if (battleState.dragonShield > 0) {
       const absorbed = Math.min(battleState.dragonShield, monsterDmg);
       battleState.dragonShield -= absorbed;
@@ -3100,7 +3293,8 @@ function showChestModal(emoji, text) {
   textEl.innerHTML = "";
   modal.classList.remove("hidden");
   setTimeout(() => {
-    animEl.textContent = emoji;
+    if (emoji.startsWith("<img")) animEl.innerHTML = emoji; // 寵物等圖片
+    else animEl.textContent = emoji;
     animEl.classList.add("chest-open");
     textEl.innerHTML = text;
   }, 380);
@@ -3413,11 +3607,11 @@ function renderCharPanel() {
 
   set("char-user-name", currentUser || "學習者");
   const avatarEl = document.getElementById("char-avatar-big");
-  if (avatarEl) avatarEl.textContent = c.avatar || "🧙";
+  if (avatarEl) avatarEl.innerHTML = avatarHtml(c.avatar);
   const picker = document.getElementById("avatar-picker");
   if (picker) {
     picker.innerHTML = AVATARS.map(a =>
-      `<button class="avatar-option${a === (c.avatar || "🧙") ? " selected" : ""}" data-avatar="${a}">${a}</button>`
+      `<button class="avatar-option${a === (c.avatar || "🧙") ? " selected" : ""}" data-avatar="${a}">${avatarHtml(a)}</button>`
     ).join("");
     picker.querySelectorAll(".avatar-option").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -3461,6 +3655,7 @@ function renderCharPanel() {
   set("inv-transmutation-fragments", `${c.transmutationFragments || 0}/24`);
   set("inv-ntd", `NT$${c.ntd || 0}`);
   renderCraftPanel();
+  renderPetPanel();
   set("task-en-zh-status", dt.enToZhDone ? "✅" : "⬜");
   set("task-zh-en-status", dt.zhToEnDone ? "✅" : "⬜");
   set("task-challenge-status", dt.challengeDone ? "✅" : "⬜");
@@ -3857,7 +4052,8 @@ function renderBossBattle() {
   const labelEl = document.getElementById("boss-monster-label");
   if (labelEl) labelEl.textContent = stage.label;
   const playerCharEl = document.getElementById("boss-player-char");
-  if (playerCharEl) playerCharEl.textContent = progress.char?.avatar || "🧙";
+  if (playerCharEl) setAvatarEl(playerCharEl);
+  renderBattlePet("boss-pet");
   const battleEl = document.getElementById("boss-battle-main");
   if (battleEl) battleEl.classList.remove("hidden");
   const resultEl = document.getElementById("boss-result");
@@ -3978,8 +4174,9 @@ function answerBossQuestion(correct, q) {
     updateBossUltimateUI();
     const atk = getPlayerAttack();
     const prevHp = bossState.bossHp;
-    bossState.bossHp = Math.max(0, bossState.bossHp - atk);
+    bossState.bossHp = Math.max(0, bossState.bossHp - atk - petAssist(false, "boss-arena"));
     updateBossHP();
+    petOnCorrect("boss");
 
     if (playerEl) { playerEl.classList.remove("attacking"); void playerEl.offsetWidth; playerEl.classList.add("attacking"); }
     if (monsterEl) { monsterEl.classList.remove("hit"); void monsterEl.offsetWidth; monsterEl.classList.add("hit"); }
@@ -4014,7 +4211,7 @@ function answerBossQuestion(correct, q) {
   } else {
     bossState.streak = 0;
     bossState.bossHp = Math.min(bossState.bossMaxHp, bossState.bossHp + 3);
-    const dmg = stage.atk;
+    const dmg = petBlock(stage.atk, "boss-arena");
     bossState.playerHp = Math.max(0, bossState.playerHp - dmg);
     updateBossHP();
     updateBossPlayerHP();
@@ -4049,7 +4246,7 @@ function triggerBossSpecialAttack(stage) {
 
   setTimeout(() => {
     if (!bossState) return;
-    const dmg = stage.atk * sp.mult;
+    const dmg = petBlock(stage.atk * sp.mult, "boss-arena");
     bossState.playerHp = Math.max(0, bossState.playerHp - dmg);
     updateBossPlayerHP();
 

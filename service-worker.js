@@ -1,4 +1,4 @@
-const CACHE = "english3000-v71";
+const CACHE = "english3000-v72";
 const ASSETS = [
   "./",
   "./index.html",
@@ -10,7 +10,13 @@ const ASSETS = [
   "./images/strawberry.png",
   "./images/boss-monster1.png",
   "./images/boss-monster2.png",
-  "./images/learned-dragon.jpg"
+  "./images/learned-dragon.jpg",
+  "./images/avatar-haohao.png",
+  "./images/pets/shadow-cat.png",
+  "./images/pets/meteor.png",
+  "./images/pets/rag-bear.png",
+  "./images/pets/patch-bear.png",
+  "./images/pets/lolli-bunny.png"
 ];
 
 self.addEventListener("install", e => {

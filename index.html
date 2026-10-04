@@ -83,7 +83,7 @@
         <!-- 戰鬥場景 -->
         <div id="battle-arena" class="battle-arena">
           <div class="battle-fighter">
-            <div id="player-char" class="battle-char">🧙</div>
+            <div class="fighter-with-pet"><img id="player-pet" class="battle-pet hidden" alt=""><div id="player-char" class="battle-char">🧙</div></div>
             <div id="player-hp-num" class="player-hp-num">3/3</div>
             <div id="dragon-shield-bar" class="dragon-shield-bar hidden"></div>
             <div class="fighter-label">學習者</div>
@@ -144,7 +144,7 @@
             <div id="boss-special-desc" class="boss-special-desc"></div>
           </div>
           <div class="boss-fighter">
-            <div id="boss-player-char" class="battle-char">🧙</div>
+            <div class="fighter-with-pet"><img id="boss-pet" class="battle-pet hidden" alt=""><div id="boss-player-char" class="battle-char">🧙</div></div>
             <div id="boss-player-hp" class="player-hp-num">3/3</div>
             <div class="fighter-label">學習者</div>
           </div>
@@ -286,6 +286,11 @@
           <span>💵 新台幣（許願用）</span>
           <span id="inv-ntd">NT$0</span>
         </div>
+      </div>
+      <div class="char-inventory-card">
+        <h3>🐾 寵物夥伴</h3>
+        <div class="pet-hint">選一隻寵物陪你出戰（一般測驗、神龍、菁英 BOSS 都有效）</div>
+        <div id="pet-panel"></div>
       </div>
       <div class="char-inventory-card">
         <h3>⚗️ 合成工坊</h3>
