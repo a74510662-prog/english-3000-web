@@ -731,22 +731,6 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-// 從例句找出要挖空的字：先找原形，再找變化形（複數、過去式、-ing…），找不到回傳 null
-function buildCloze(q) {
-  const base = q.word.toLowerCase();
-  if (/[^a-z']/.test(base)) return null;
-  const stem = base.replace(/e$/, "");
-  const tryMatch = test => {
-    for (const ex of q.examples || []) {
-      const m = (ex.en.match(/[A-Za-z']+/g) || []).find(t => test(t.toLowerCase()));
-      if (m) return { ex, answer: m };
-    }
-    return null;
-  };
-  return tryMatch(t => t === base)
-    || tryMatch(t => t.startsWith(stem) && t.length >= base.length && t.length - base.length <= 3);
-}
-
 function renderDragonQuestion(q) {
   document.getElementById("q-current").textContent = state.quiz.idx + 1;
   document.getElementById("q-total").textContent = state.quiz.questions.length;
@@ -760,28 +744,28 @@ function renderDragonQuestion(q) {
     battleState.sorcererBuff = false;
     sorcererLv = Math.max(1, getEquippedClassLevel());
   }
-  // 兩種題型都提示中文＋發音，由學習者拼出英文；填空題另外附上例句
-  const cloze = Math.random() < 0.5 ? buildCloze(q) : null;
-  const ans = cloze ? cloze.answer : q.word;
-  state.quiz.dragonQ = cloze
-    ? { type: "cloze", answer: ans, sentence: cloze.ex.en }
-    : { type: "listen", answer: ans };
+  // 只考單字本身：兩種題型都提示中文＋發音，由學習者拼出完整英文單字
+  // 聽力題：只給第一個字母；填空題：單字挖掉約一半字母
+  const ans = q.word;
+  const isFill = Math.random() < 0.5;
+  state.quiz.dragonQ = { type: isFill ? "fill" : "listen", answer: ans };
 
-  const reveal = Math.max(1, Math.min(ans.length - 1, 1 + sorcererLv));
-  if (sorcererLv) showBattleEffect(`🪄魔法提示 +${reveal - 1} 字母`, "#a29bfe");
-  // 提示：前幾個字母＋其餘字母用底線（空格、連字號照原樣顯示）
-  const hint = ans.slice(0, reveal) + [...ans.slice(reveal)].map(c => /[A-Za-z]/.test(c) ? " _" : ` ${c}`).join("");
+  const letterIdx = [...ans].map((c, i) => /[A-Za-z]/.test(c) ? i : -1).filter(i => i > 0);
+  let blanks;
+  if (isFill) {
+    const blankCount = Math.max(1, Math.ceil(letterIdx.length / 2) - sorcererLv);
+    blanks = new Set(shuffle(letterIdx).slice(0, blankCount));
+  } else {
+    // 聽力題：術士多顯示前面幾個字母
+    blanks = new Set(letterIdx.slice(Math.min(sorcererLv, Math.max(0, letterIdx.length - 1))));
+  }
+  if (sorcererLv) showBattleEffect(`🪄魔法提示：多顯示字母`, "#a29bfe");
+  const hint = [...ans].map((c, i) => blanks.has(i) ? "_" : c).join(" ");
   const letterCount = (ans.match(/[A-Za-z]/g) || []).length;
 
-  let html = `<div class="dragon-qtype">${cloze ? "✏️ 填空題：依中文與發音，拼出句子缺少的單字" : "🎧 聽力題：依中文與發音，拼出英文單字"}（${letterCount} 個字母）</div>`;
+  let html = `<div class="dragon-qtype">${isFill ? "✏️ 填空題：補上缺少的字母，拼出完整單字" : "🎧 聽力題：聽發音，拼出英文單字"}（${letterCount} 個字母）</div>`;
   html += `<div class="dragon-meaning">${escapeHtml(q.meaning)}</div>`;
-  if (cloze) {
-    const idx = cloze.ex.en.indexOf(ans);
-    html += `<div class="cloze-sentence">${escapeHtml(cloze.ex.en.slice(0, idx))}<span class="cloze-blank">${escapeHtml(hint)}</span>${escapeHtml(cloze.ex.en.slice(idx + ans.length))}</div>
-      <div class="cloze-zh">${escapeHtml(cloze.ex.zh)}</div>`;
-  } else {
-    html += `<div class="cloze-sentence"><span class="cloze-blank">${escapeHtml(hint)}</span></div>`;
-  }
+  html += `<div class="cloze-sentence"><span class="cloze-blank">${escapeHtml(hint)}</span></div>`;
   qEl.innerHTML = html;
   const btns = document.createElement("div");
   btns.className = "dragon-listen-btns";
@@ -795,11 +779,9 @@ function renderDragonQuestion(q) {
   row.innerHTML = `<input type="text" id="cloze-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="輸入英文單字"><button id="cloze-submit">送出</button>`;
   opts.appendChild(row);
   const input = row.querySelector("input");
-  // 填空題的變化形（例如 animals）也接受原形 animal
-  const accepted = new Set([ans.toLowerCase(), q.word.toLowerCase()]);
   const submit = () => {
     if (input.disabled || !input.value.trim()) return;
-    const ok = accepted.has(input.value.trim().toLowerCase().replace(/\s+/g, " "));
+    const ok = input.value.trim().toLowerCase().replace(/\s+/g, " ") === ans.toLowerCase();
     input.disabled = true;
     input.classList.add(ok ? "correct" : "wrong");
     answerQuestion(null, ok, q);
@@ -942,10 +924,9 @@ function answerQuestion(btn, isCorrect, q) {
       }, 700);
     }
   }
-  // 神龍討伐戰：作答後朗讀（填空題念完整例句）
+  // 神龍討伐戰：作答後再朗讀一次單字
   if (state.quiz.range === "all") {
-    const dq = state.quiz.dragonQ || {};
-    setTimeout(() => speak(dq.type === "cloze" ? dq.sentence : q.word, 0.8), 400);
+    setTimeout(() => speak(q.word, 0.8), 400);
   }
   saveProgress(progress);
   fb.classList.remove("hidden");
