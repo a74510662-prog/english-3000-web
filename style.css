@@ -1585,3 +1585,28 @@ body {
 .cloze-input-row input.correct { border-color: var(--correct); background: #eafaf1; }
 .cloze-input-row input.wrong { border-color: var(--wrong); background: #fdecea; }
 .quiz-options .cloze-input-row button { text-align: center; padding: 14px 18px; min-height: 0; background: var(--primary); color: white; border-color: var(--primary); }
+
+/* ✍️ 拼字練習 */
+.spell-practice { display: flex; flex-direction: column; gap: 12px; }
+.spell-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; color: var(--text-light); }
+.spell-stars { color: #f4a261; letter-spacing: 1px; }
+.spell-card { background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: var(--shadow); }
+.spell-step { font-size: 0.85rem; color: var(--text-light); margin-bottom: 10px; }
+.spell-word { font-size: 2.2rem; font-weight: bold; color: var(--primary); letter-spacing: 2px; word-break: break-word; }
+.spell-kk { font-size: 0.95rem; color: var(--text-light); margin: 4px 0; }
+.spell-meaning { font-size: 1.25rem; font-weight: bold; color: var(--text); margin: 6px 0; }
+.spell-main-btn { padding: 14px; font-size: 1.05rem; border-radius: 12px; border: none; background: var(--primary); color: white; cursor: pointer; }
+.spell-peek-btn { padding: 10px; font-size: 0.95rem; border-radius: 12px; border: 1px solid var(--border); background: white; color: var(--text-light); cursor: pointer; }
+.spell-result { font-size: 1.3rem; font-weight: bold; margin-bottom: 8px; }
+.spell-result.ok { color: var(--correct); }
+.spell-result.no { color: var(--wrong); }
+.spell-compare { display: inline-flex; flex-direction: column; gap: 6px; text-align: left; margin: 4px 0 8px; }
+.spell-label { display: inline-block; width: 4em; font-size: 0.8rem; color: var(--text-light); }
+.spell-typed, .spell-answer { font-size: 1.5rem; font-family: Consolas, "Courier New", monospace; letter-spacing: 3px; }
+.spell-answer { color: var(--primary); font-weight: bold; }
+.spell-ok { color: var(--correct); }
+.spell-bad { color: white; background: var(--wrong); border-radius: 3px; }
+.spell-miss { color: var(--text-light); background: var(--border); border-radius: 3px; }
+.spell-reward { color: #6c5ce7; font-weight: bold; margin-top: 6px; }
+.spell-summary { line-height: 1.9; font-size: 1rem; }
+.spell-tip { margin-top: 8px; font-size: 0.85rem; color: var(--text-light); }

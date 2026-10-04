@@ -576,6 +576,8 @@ function resetQuizSetup() {
   document.getElementById("quiz-game").classList.add("hidden");
   document.getElementById("quiz-result").classList.add("hidden");
   document.getElementById("quiz-defeat").classList.add("hidden");
+  document.getElementById("spell-practice").classList.add("hidden");
+  document.getElementById("boss-challenge-card").classList.remove("hidden");
   document.querySelectorAll(".quiz-mode-group button, .quiz-range-group button").forEach(b => b.classList.remove("active"));
   state.quiz = { mode: null, range: null, questions: [], idx: 0, correct: 0, coinsEarned: 0 };
   updateSelfStudyQuizBtn();
@@ -610,8 +612,11 @@ function buildAllPoolQuestions(count) {
   const learnedSet = new Set(progress.learnedIds || []);
   const unlearned = shuffle(wordsPool.filter(w => !learnedSet.has(w.id)));
   const learned   = shuffle(wordsPool.filter(w =>  learnedSet.has(w.id)));
-  // 全部從已熟記（學習過）的字出題；已熟記不足 25 字時才用未熟記字補齊
-  const selected = [...learned.slice(0, count)];
+  // 全部從已熟記（學習過）的字出題，練習過拼字的字優先；已熟記不足 25 字時才用未熟記字補齊
+  const spell = progress.spell || {};
+  const practiced = learned.filter(w => spell[w.id]);
+  const others = learned.filter(w => !spell[w.id]);
+  const selected = [...practiced, ...others].slice(0, count);
   if (selected.length < count) selected.push(...unlearned.slice(0, count - selected.length));
   return shuffle(selected);
 }
@@ -729,6 +734,181 @@ function renderQuestion() {
 // === 神龍討伐戰：聽力題（聽發音選意思）＋ 填空題（例句挖空，拼出單字）===
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// === ✍️ 拼字練習：看 → 念 → 遮 → 寫 → 對（Look-Say-Cover-Write-Check）===
+// progress.spell[id] = { lv: 0~5, last: "YYYY-MM-DD" }；第一次就拼對 lv+1，拼錯 lv-1；lv ≥ SPELL_GOOD_LV 算「會拼」
+// 每個字每天第一次就拼對才給 💎 拼字結晶（避免同一字重複刷）
+const SPELL_SESSION_SIZE = 10;
+const SPELL_GOOD_LV = 2;
+const SPELL_MAX_LV = 5;
+const CEFR_ORDER = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
+let spellState = null;
+
+function getSpellGoodCount() {
+  const spell = progress.spell || {};
+  return Object.values(spell).filter(e => e.lv >= SPELL_GOOD_LV).length;
+}
+
+// 選字：① 之前拼錯、還不會拼的字 ② 沒練過的字（A1 短字優先，2 個字母的字排最後）③ 已會拼、最久沒練的字；今天練過的排最後
+function buildSpellWords() {
+  const today = todayDateString();
+  const spell = progress.spell || {};
+  const learnedSet = new Set(progress.learnedIds || []);
+  const learned = wordsPool.filter(w => learnedSet.has(w.id));
+  const pool = learned.length >= SPELL_SESSION_SIZE ? learned : wordsPool;
+  const notToday = pool.filter(w => !spell[w.id] || spell[w.id].last !== today);
+  const weak = shuffle(notToday.filter(w => spell[w.id] && spell[w.id].lv < SPELL_GOOD_LV));
+  const fresh = notToday.filter(w => !spell[w.id])
+    .sort((a, b) => (a.word.length <= 2) - (b.word.length <= 2) || (CEFR_ORDER[a.level] || 9) - (CEFR_ORDER[b.level] || 9) || a.word.length - b.word.length || a.id - b.id);
+  const good = notToday.filter(w => spell[w.id] && spell[w.id].lv >= SPELL_GOOD_LV)
+    .sort((a, b) => spell[a.id].last.localeCompare(spell[b.id].last));
+  let picked = [...weak.slice(0, 4)];
+  picked = picked.concat(fresh.slice(0, SPELL_SESSION_SIZE - picked.length));
+  picked = picked.concat(good.slice(0, SPELL_SESSION_SIZE - picked.length));
+  if (picked.length < SPELL_SESSION_SIZE) {
+    const used = new Set(picked.map(w => w.id));
+    picked = picked.concat(shuffle(pool.filter(w => !used.has(w.id))).slice(0, SPELL_SESSION_SIZE - picked.length));
+  }
+  return picked;
+}
+
+function startSpellPractice() {
+  stopQuestionTimer();
+  document.getElementById("quiz-setup").classList.add("hidden");
+  document.getElementById("boss-challenge-card").classList.add("hidden");
+  document.getElementById("spell-practice").classList.remove("hidden");
+  spellState = { words: buildSpellWords(), idx: 0, phase: "look", firstTry: true, firstCorrect: 0, crystals: 0, typed: "" };
+  renderSpellPractice();
+}
+
+function spellDiffHtml(answer, typed) {
+  // 顯示學習者打的字：位置正確綠色、錯誤紅底；少打的字母用灰色底線補位
+  const out = [...typed].map((t, i) => {
+    const c = answer[i];
+    const cls = c !== undefined && t.toLowerCase() === c.toLowerCase() ? "spell-ok" : "spell-bad";
+    return `<span class="${cls}">${escapeHtml(t)}</span>`;
+  });
+  for (let i = typed.length; i < answer.length; i++) out.push(`<span class="spell-miss">_</span>`);
+  return out.join("");
+}
+
+function renderSpellPractice() {
+  const el = document.getElementById("spell-practice");
+  const st = spellState;
+  if (st.idx >= st.words.length) { renderSpellSummary(); return; }
+  const w = st.words[st.idx];
+  const e = (progress.spell || {})[w.id];
+  const lv = e ? e.lv : 0;
+  const stars = "★".repeat(lv) + "☆".repeat(SPELL_MAX_LV - lv);
+  const head = `<div class="spell-head"><span>✍️ 拼字練習 ${st.idx + 1} / ${st.words.length}</span><span class="spell-stars">${stars}</span></div>`;
+  const letterCount = (w.word.match(/[A-Za-z]/g) || []).length;
+
+  if (st.phase === "look") {
+    el.innerHTML = head + `
+      <div class="spell-card">
+        <div class="spell-step">① 看清楚　② 跟著念一遍${st.firstTry ? "" : "　（再看一次，記住拼法）"}</div>
+        <div class="spell-word">${escapeHtml(w.word)}</div>
+        <div class="spell-kk">KK ${escapeHtml(w.kk)}</div>
+        <div class="spell-meaning">${escapeHtml(w.meaning)}</div>
+        <div class="dragon-listen-btns"><button id="spell-say">🔊 發音</button><button id="spell-slow">🐢 慢速</button></div>
+      </div>
+      <button class="spell-main-btn" id="spell-cover">③ 我記住了，遮起來 ✍️</button>`;
+    el.querySelector("#spell-say").onclick = () => speak(w.word, 0.9);
+    el.querySelector("#spell-slow").onclick = () => speak(w.word, 0.5);
+    el.querySelector("#spell-cover").onclick = () => { st.phase = "write"; renderSpellPractice(); };
+    setTimeout(() => speak(w.word, 0.8), 200);
+  } else if (st.phase === "write") {
+    el.innerHTML = head + `
+      <div class="spell-card">
+        <div class="spell-step">④ 不看單字，自己拼出來（${letterCount} 個字母）</div>
+        <div class="spell-meaning">${escapeHtml(w.meaning)}</div>
+        <div class="dragon-listen-btns"><button id="spell-say">🔊 發音</button><button id="spell-slow">🐢 慢速</button></div>
+      </div>
+      <div class="cloze-input-row"><input type="text" id="spell-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="輸入英文單字"><button id="spell-submit">送出</button></div>
+      <button class="spell-peek-btn" id="spell-peek">👀 想不起來，再看一次</button>`;
+    el.querySelector("#spell-say").onclick = () => speak(w.word, 0.9);
+    el.querySelector("#spell-slow").onclick = () => speak(w.word, 0.5);
+    const input = el.querySelector("#spell-input");
+    const submit = () => {
+      if (!input.value.trim()) return;
+      st.typed = input.value.trim().replace(/\s+/g, " ");
+      st.phase = "check";
+      recordSpellAttempt(w, st.typed.toLowerCase() === w.word.toLowerCase());
+      renderSpellPractice();
+    };
+    el.querySelector("#spell-submit").onclick = submit;
+    input.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); submit(); } });
+    el.querySelector("#spell-peek").onclick = () => {
+      if (st.firstTry) recordSpellAttempt(w, false); // 偷看視同第一次沒拼出來
+      st.phase = "look";
+      renderSpellPractice();
+    };
+    setTimeout(() => input.focus(), 50);
+  } else {
+    const ok = st.typed.toLowerCase() === w.word.toLowerCase();
+    el.innerHTML = head + `
+      <div class="spell-card">
+        <div class="spell-step">⑤ 對答案</div>
+        <div class="spell-result ${ok ? "ok" : "no"}">${ok ? "✅ 拼對了！" : "❌ 還差一點"}</div>
+        <div class="spell-compare"><div><span class="spell-label">你寫的</span><span class="spell-typed">${spellDiffHtml(w.word, st.typed)}</span></div>
+          <div><span class="spell-label">正確</span><span class="spell-answer">${escapeHtml(w.word)}</span></div></div>
+        <div class="spell-meaning">${escapeHtml(w.meaning)}</div>
+        ${st.lastReward ? `<div class="spell-reward">💎 拼字結晶 +1</div>` : ""}
+      </div>
+      <button class="spell-main-btn" id="spell-next">${ok ? (st.idx + 1 >= st.words.length ? "完成 🎉" : "下一個 ➜") : "再看一次，重新拼 ✍️"}</button>`;
+    el.querySelector("#spell-next").onclick = () => {
+      if (ok) { st.idx++; st.firstTry = true; }
+      else st.firstTry = false;
+      st.phase = "look";
+      st.lastReward = false;
+      renderSpellPractice();
+    };
+    speak(w.word, 0.8);
+  }
+}
+
+// 只有每個字的「第一次作答」會影響等級與獎勵；拼錯後重拼不再加減
+function recordSpellAttempt(w, correct) {
+  const st = spellState;
+  if (!st.firstTry) return;
+  st.firstTry = false;
+  if (!progress.spell) progress.spell = {};
+  const today = todayDateString();
+  const e = progress.spell[w.id] || { lv: 0, last: "" };
+  const firstToday = e.last !== today;
+  if (correct) {
+    st.firstCorrect++;
+    if (firstToday) {
+      e.lv = Math.min(SPELL_MAX_LV, e.lv + 1);
+      ensureChar();
+      progress.char.spellCrystals = (progress.char.spellCrystals || 0) + 1;
+      st.crystals++;
+      st.lastReward = true;
+    }
+  } else {
+    e.lv = Math.max(0, e.lv - 1);
+  }
+  e.last = today;
+  progress.spell[w.id] = e;
+  saveProgress(progress);
+}
+
+function renderSpellSummary() {
+  const st = spellState;
+  const el = document.getElementById("spell-practice");
+  el.innerHTML = `
+    <div class="spell-card">
+      <div class="spell-result ok">🎉 練習完成！</div>
+      <div class="spell-summary">第一次就拼對：<strong>${st.firstCorrect}</strong> / ${st.words.length}<br>
+        獲得 💎 拼字結晶 ×${st.crystals}（共 ${progress.char.spellCrystals || 0}）<br>
+        目前會拼的字：✍️ ${getSpellGoodCount()} 字</div>
+      <div class="spell-tip">練習過的字會優先出現在 🐉 神龍討伐戰</div>
+    </div>
+    <button class="spell-main-btn" id="spell-again">再練一組 ✍️</button>
+    <button class="spell-peek-btn" id="spell-back">返回測驗選單</button>`;
+  el.querySelector("#spell-again").onclick = startSpellPractice;
+  el.querySelector("#spell-back").onclick = resetQuizSetup;
 }
 
 function renderDragonQuestion(q) {
@@ -1094,6 +1274,7 @@ function renderProgress() {
   document.getElementById("stat-percent").textContent = pctOfTarget + "%";
   document.getElementById("stat-mastered").textContent = getSrsMasteredCount();
   document.getElementById("stat-due").textContent = getSrsDueIds().length;
+  document.getElementById("stat-spell").textContent = getSpellGoodCount();
   document.getElementById("progress-current").textContent = learned;
   document.getElementById("progress-total").textContent = TOTAL_TARGET;
   document.getElementById("progress-fill").style.width = pctOfTarget + "%";
@@ -3147,6 +3328,7 @@ function renderCharPanel() {
   set("inv-potions", c.potions);
   set("inv-chests", c.chests);
   set("inv-rainbow", c.rainbowTickets || 0);
+  set("inv-spell-crystals", c.spellCrystals || 0);
   set("inv-universal-fragments", c.universalFragments || 0);
   set("inv-transmutation-fragments", `${c.transmutationFragments || 0}/24`);
   set("inv-ntd", `NT$${c.ntd || 0}`);
@@ -3337,6 +3519,7 @@ document.getElementById("back-to-today").addEventListener("click", () => {
     b.addEventListener("click", () => {
       document.querySelectorAll(".quiz-range-group button").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
+      if (b.dataset.range === "spell") { startSpellPractice(); return; }
       state.quiz.range = b.dataset.range;
       if (state.quiz.range === "all") state.quiz.mode = "dragon";
       tryStartQuiz();

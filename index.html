@@ -74,6 +74,7 @@
         <div class="quiz-range-group">
           <button data-range="today">僅今日 10 字 <span class="range-reward">📦</span></button>
           <button data-range="learned">複習已熟記 <span class="range-reward">💰</span></button>
+          <button data-range="spell">✍️ 拼字練習 <span class="range-reward">看→遮→寫 💎</span></button>
           <button data-range="all">🐉 神龍討伐戰 <span class="range-reward">聽力＋填空 🌈</span></button>
           <button data-range="selfStudy" id="quiz-range-selfstudy" disabled>自主學習測驗 <span class="range-reward">0字</span></button>
         </div>
@@ -129,6 +130,7 @@
         <div id="defeat-score" class="defeat-score"></div>
         <button id="defeat-restart">重新挑戰</button>
       </div>
+      <div id="spell-practice" class="spell-practice hidden"></div>
     </section>
 
     <!-- BOSS 挑戰頁 -->
@@ -199,6 +201,10 @@
           <div class="stat-num" id="stat-due">0</div>
           <div class="stat-label">📅 今日待複習</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-spell">0</div>
+          <div class="stat-label">✍️ 會拼字數</div>
+        </div>
       </div>
       <div class="progress-bar-wrap">
         <div class="progress-bar"><div id="progress-fill"></div></div>
@@ -259,6 +265,10 @@
         <div class="inventory-row">
           <span>🌈 彩虹券</span>
           <span id="inv-rainbow">0</span>
+        </div>
+        <div class="inventory-row">
+          <span>💎 拼字結晶</span>
+          <span id="inv-spell-crystals">0</span>
         </div>
         <div class="inventory-row">
           <span>🔧 通用武器碎片</span>
