@@ -2059,7 +2059,7 @@ function renderWishRewards() {
         <div class="shop-item-icon">${w.badge}</div>
         <div class="shop-item-info wish-info" style="flex:1">
           <div class="shop-item-name">${w.title}　<span class="shop-wish-done-badge">✅ 已獲得</span></div>
-          <div class="shop-wish-cost">💵目前 NT$${ntd}・這個稱號可以許 1 次願</div>
+          <div class="shop-wish-cost">💵目前 NT$${ntd} / ${getNtdHoldCap()}（持有上限）・這個稱號可以許 1 次願</div>
           <input type="number" class="wish-redeem-input wish-amount-input" placeholder="兌換金額 NT$" min="1">
           <input type="text" class="wish-redeem-input wish-text-input" placeholder="輸入願望內容">
         </div>
@@ -3130,8 +3130,16 @@ const BOSS_UNLOCK_WORDS = 300;
 const BOSS_TRANSMUTATION_REQUIRED = 24;
 const BOSS_RAINBOW_FRAGMENT_REQUIRED = 10;
 const BOSS_WEEKLY_NTD_CAP = 1000;
+// 新台幣持有上限：尚未兌換任何稱號前 5000，兌換第一個稱號後最多 30000
+const NTD_HOLD_CAP_NO_TITLE = 5000;
+const NTD_HOLD_CAP_WITH_TITLE = 30000;
 const BOSS_SPECIAL_INTERVAL = 500;
 const BOSS_SPECIAL_DEFEAT_HEAL = 100;
+
+function getNtdHoldCap() {
+  const claimed = progress.wishesClaimed || [];
+  return claimed.some(Boolean) ? NTD_HOLD_CAP_WITH_TITLE : NTD_HOLD_CAP_NO_TITLE;
+}
 
 // 每 500 點血量門檻累計觸發次數（用於偵測是否剛跨過新門檻）
 function getSpecialThresholdCount(maxHp, hp) {
@@ -3162,11 +3170,13 @@ function getBossNtdEarnedThisWeek() {
   return progress.char.bossNtdEarned;
 }
 
-// BOSS 挑戰掉落的新台幣（許願兌換現實物品用，跟遊戲金幣是不同貨幣），每週上限 1000，回傳實際發放數量
+// BOSS 挑戰掉落的新台幣（許願兌換現實物品用，跟遊戲金幣是不同貨幣），每週上限 1000、持有上限依稱號階段而定，回傳實際發放數量
 function addBossNtd(amount) {
   ensureChar();
   const earned = getBossNtdEarnedThisWeek();
-  const given = Math.max(0, Math.min(amount, BOSS_WEEKLY_NTD_CAP - earned));
+  const weeklyRemain = Math.max(0, BOSS_WEEKLY_NTD_CAP - earned);
+  const holdRemain = Math.max(0, getNtdHoldCap() - (progress.char.ntd || 0));
+  const given = Math.max(0, Math.min(amount, weeklyRemain, holdRemain));
   if (given > 0) {
     progress.char.ntd = (progress.char.ntd || 0) + given;
     progress.char.bossNtdEarned = earned + given;
@@ -3205,7 +3215,7 @@ function renderBossCard() {
       <div class="boss-frag-bar-bg"><div class="boss-frag-bar-fill" style="width:${Math.min(100,(rfrags/BOSS_RAINBOW_FRAGMENT_REQUIRED)*100).toFixed(1)}%"></div></div>
     </div>
     <div class="boss-card-week">💵 本週 BOSS 新台幣：NT$${ntdEarned} / ${BOSS_WEEKLY_NTD_CAP}</div>
-    <div class="boss-card-week">💵 目前累積新台幣：NT$${progress.char.ntd || 0}</div>
+    <div class="boss-card-week">💵 目前累積新台幣：NT$${progress.char.ntd || 0} / ${getNtdHoldCap()}（持有上限）</div>
     <button class="boss-fight-btn" onclick="startBossBattle()">⚔️ 開始挑戰</button>`;
 }
 
@@ -3393,7 +3403,8 @@ function answerBossQuestion(correct, q) {
       // 小BOSS 被擊敗 → 掉新台幣（許願兌換用，非遊戲金幣），緊接著挑戰下一隻
       const ntdRoll = getBossNtdDropAmount();
       const given = addBossNtd(ntdRoll);
-      if (fb) { fb.textContent = `✅ 擊敗 ${stage.label}！獲得 💵NT$${given}`; fb.className = "boss-feedback boss-fb-correct"; }
+      const ntdNote = given > 0 ? "" : "（新台幣已達上限）";
+      if (fb) { fb.textContent = `✅ 擊敗 ${stage.label}！獲得 💵NT$${given}${ntdNote}`; fb.className = "boss-feedback boss-fb-correct"; }
       bossState.stageAdvancePending = true;
       playMonsterDeathSfx();
     } else if (bossState.bossHp <= 0) {
@@ -3511,7 +3522,8 @@ function useUltimate() {
   if (bossState.bossHp <= 0 && bossState.stageIdx < BOSS_STAGES.length - 1) {
     const ntdRoll = getBossNtdDropAmount();
     const given = addBossNtd(ntdRoll);
-    if (fb) { fb.textContent = `✅ ${ultName}擊敗 ${stage.label}！獲得 💵NT$${given}`; fb.className = "boss-feedback boss-fb-correct"; }
+    const ntdNote = given > 0 ? "" : "（新台幣已達上限）";
+    if (fb) { fb.textContent = `✅ ${ultName}擊敗 ${stage.label}！獲得 💵NT$${given}${ntdNote}`; fb.className = "boss-feedback boss-fb-correct"; }
     bossState.stageAdvancePending = true;
     playMonsterDeathSfx();
     if (nextBtn) nextBtn.classList.remove("hidden");
@@ -3567,7 +3579,7 @@ function finishBossBattle(victory) {
     playVictorySfx();
     // 全部三隻擊敗（菁英BOSS）→ 必定獲得 100 新台幣 + 彩虹碎片或幻化碎片其中一種，並重置回小BOSS 1 供下一輪刷關
     const given = addBossNtd(100);
-    const ntdLine = given > 0 ? `獲得 💵 新台幣 NT$${given}` : `本週 BOSS 新台幣已達上限`;
+    const ntdLine = given > 0 ? `獲得 💵 新台幣 NT$${given}` : `新台幣已達上限（本週或持有上限）`;
     let fragLine;
     if (Math.random() < 0.5) {
       const rainbowGain = 2 + Math.floor(Math.random() * 4); // 2~5顆
