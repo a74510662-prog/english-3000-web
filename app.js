@@ -850,6 +850,10 @@ function answerQuestion(btn, isCorrect, q) {
     state.quiz.correct++;
     progress.quizCorrect++;
     battleState.consecutiveCorrect = (battleState.consecutiveCorrect || 0) + 1;
+    if (state.quiz.range === "all") {
+      battleState.energy = Math.min(100, (battleState.energy || 0) + (battleState.consecutiveCorrect >= 2 ? 20 : 10));
+      updateDragonUltimateUI();
+    }
     // 熟記模式答對 → 累計計數，連續答對 3 次才從弱點清單移除
     if (state.quiz.range === "learned" && progress.weakWordIds && progress.weakWordIds.includes(q.id)) {
       if (!progress.weakWordCounts) progress.weakWordCounts = {};
@@ -1500,6 +1504,61 @@ function initBattle() {
   updateMonsterHP();
   updatePlayerHP();
   if (state.quiz?.range === "learned") updateLearnedBattleDisplay();
+  battleState.energy = 0;
+  updateDragonUltimateUI();
+}
+
+// === 神龍討伐戰絕招：沿用菁英 BOSS 規則（答對 +10 能量、連續答對 +20，滿 100 手動施放，依絕招等級造成巨龍最大 HP 的比例傷害）===
+// 跟 BOSS 戰不同：施放不佔用題目，不影響 25 題全對獎勵
+function updateDragonUltimateUI() {
+  const row = document.getElementById("quiz-ultimate-row");
+  const btn = document.getElementById("quiz-ultimate-btn");
+  const fill = document.getElementById("quiz-energy-fill");
+  if (!row || !btn) return;
+  const lv = getUltimateLevel();
+  const cls = getEquippedClassDef();
+  if (state.quiz?.range !== "all" || lv <= 0 || !cls) {
+    row.classList.add("hidden");
+    return;
+  }
+  row.classList.remove("hidden");
+  const energy = Math.min(100, battleState.energy || 0);
+  if (fill) fill.style.width = energy + "%";
+  btn.innerHTML = `${cls.emoji} ${cls.name}絕招 Lv.${lv} <span>${energy}</span>/100`;
+  btn.disabled = energy < 100 || battleState.playerHp <= 0 || battleState.hp <= 0;
+}
+
+function useDragonUltimate() {
+  if (state.quiz?.range !== "all") return;
+  const lv = getUltimateLevel();
+  const cls = getEquippedClassDef();
+  if (lv <= 0 || !cls || (battleState.energy || 0) < 100) return;
+  if (battleState.playerHp <= 0 || battleState.hp <= 0) return;
+  battleState.energy = 0;
+  const ultName = `${cls.emoji}${cls.ultName || cls.name + "絕招"}`;
+  const dmg = Math.round(battleState.monsterMaxHp * ULTIMATE_DAMAGE_PCT[lv]);
+  battleState.hp = Math.max(0, battleState.hp - dmg);
+  updateMonsterHP();
+  updateDragonUltimateUI();
+
+  const critEl = document.getElementById("critical-text");
+  if (critEl) {
+    critEl.textContent = `${ultName} -${dmg}HP`;
+    critEl.classList.remove("crit-anim");
+    void critEl.offsetWidth;
+    critEl.classList.add("crit-anim");
+  }
+  showBattleEffect(`🌟 Lv.${lv} 絕招爆發！`, "#ffd700");
+  showDamageNumber(dmg, true, "#ffd700");
+  shakeArena(true);
+  playBossSpecialSfx();
+  const monsterEl = document.getElementById("monster-char");
+  if (monsterEl) {
+    monsterEl.classList.remove("hit");
+    void monsterEl.offsetWidth;
+    monsterEl.classList.add("hit");
+    if (battleState.hp <= 0) setTimeout(() => handleMonsterDeath(monsterEl), 500);
+  }
 }
 
 function updateLearnedBattleDisplay() {
@@ -3219,6 +3278,7 @@ document.getElementById("back-to-today").addEventListener("click", () => {
   });
   document.getElementById("quiz-use-potion-btn").addEventListener("click", usePotion);
   document.getElementById("boss-ultimate-btn").addEventListener("click", useUltimate);
+  document.getElementById("quiz-ultimate-btn").addEventListener("click", useDragonUltimate);
   document.getElementById("boss-use-potion-btn").addEventListener("click", useBossPotion);
   document.getElementById("chest-close-btn").addEventListener("click", () => {
     document.getElementById("chest-modal").classList.add("hidden");
