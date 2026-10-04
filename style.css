@@ -1563,7 +1563,8 @@ body {
 
 /* 神龍討伐戰：聽力題、填空題 */
 .dragon-qtype { font-size: 0.85rem; color: var(--text-light); font-weight: normal; margin-bottom: 6px; }
-.dragon-listen-btns { display: flex; gap: 10px; justify-content: center; }
+.dragon-meaning { font-size: 1.3rem; color: var(--primary); font-weight: bold; margin: 2px 0 6px; }
+.dragon-listen-btns { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
 .dragon-listen-btns button {
   padding: 10px 18px; font-size: 1.1rem; border-radius: 10px;
   border: 2px solid var(--primary-light); background: white; color: var(--primary); cursor: pointer;
@@ -1576,9 +1577,9 @@ body {
   font-weight: bold; letter-spacing: 2px;
 }
 .cloze-zh { font-size: 0.9rem; color: var(--text-light); font-weight: normal; margin-top: 6px; }
-.cloze-input-row { display: flex; gap: 8px; }
+.cloze-input-row { display: flex; gap: 8px; min-width: 0; width: 100%; }
 .cloze-input-row input {
-  flex: 1; min-width: 0; padding: 14px 12px; font-size: 1.15rem;
+  flex: 1; min-width: 0; width: 100%; padding: 14px 12px; font-size: 1.15rem;
   border: 2px solid var(--border); border-radius: 12px;
 }
 .cloze-input-row input.correct { border-color: var(--correct); background: #eafaf1; }

@@ -754,66 +754,64 @@ function renderDragonQuestion(q) {
   const qEl = document.getElementById("quiz-question");
   const opts = document.getElementById("quiz-options");
   opts.innerHTML = "";
-  // 術士：連答對 3 題後，下一題獲得魔法提示（聽力消除選項／填空多顯示字母）
+  // 術士：連答對 3 題後，下一題多顯示字母提示
   let sorcererLv = 0;
   if (getEquippedClassKey() === "sorcerer" && battleState.sorcererBuff) {
     battleState.sorcererBuff = false;
     sorcererLv = Math.max(1, getEquippedClassLevel());
   }
+  // 兩種題型都提示中文＋發音，由學習者拼出英文；填空題另外附上例句
   const cloze = Math.random() < 0.5 ? buildCloze(q) : null;
-  state.quiz.dragonQ = cloze ? { type: "cloze", answer: cloze.answer, sentence: cloze.ex.en } : { type: "listen" };
+  const ans = cloze ? cloze.answer : q.word;
+  state.quiz.dragonQ = cloze
+    ? { type: "cloze", answer: ans, sentence: cloze.ex.en }
+    : { type: "listen", answer: ans };
 
+  const reveal = Math.max(1, Math.min(ans.length - 1, 1 + sorcererLv));
+  if (sorcererLv) showBattleEffect(`🪄魔法提示 +${reveal - 1} 字母`, "#a29bfe");
+  // 提示：前幾個字母＋其餘字母用底線（空格、連字號照原樣顯示）
+  const hint = ans.slice(0, reveal) + [...ans.slice(reveal)].map(c => /[A-Za-z]/.test(c) ? " _" : ` ${c}`).join("");
+  const letterCount = (ans.match(/[A-Za-z]/g) || []).length;
+
+  let html = `<div class="dragon-qtype">${cloze ? "✏️ 填空題：依中文與發音，拼出句子缺少的單字" : "🎧 聽力題：依中文與發音，拼出英文單字"}（${letterCount} 個字母）</div>`;
+  html += `<div class="dragon-meaning">${escapeHtml(q.meaning)}</div>`;
   if (cloze) {
-    const ans = cloze.answer;
-    const reveal = Math.max(1, Math.min(ans.length - 1, 1 + sorcererLv));
-    if (sorcererLv) showBattleEffect(`🪄魔法提示 +${reveal - 1} 字母`, "#a29bfe");
-    const hint = ans.slice(0, reveal) + " _".repeat(ans.length - reveal);
     const idx = cloze.ex.en.indexOf(ans);
-    const sentence = escapeHtml(cloze.ex.en.slice(0, idx)) + `<span class="cloze-blank">${escapeHtml(hint)}</span>` + escapeHtml(cloze.ex.en.slice(idx + ans.length));
-    qEl.innerHTML = `<div class="dragon-qtype">✏️ 填空題：依句意拼出單字（${ans.length} 個字母）</div>
-      <div class="cloze-sentence">${sentence}</div>
+    html += `<div class="cloze-sentence">${escapeHtml(cloze.ex.en.slice(0, idx))}<span class="cloze-blank">${escapeHtml(hint)}</span>${escapeHtml(cloze.ex.en.slice(idx + ans.length))}</div>
       <div class="cloze-zh">${escapeHtml(cloze.ex.zh)}</div>`;
-    const row = document.createElement("div");
-    row.className = "cloze-input-row";
-    row.innerHTML = `<input type="text" id="cloze-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="輸入單字"><button id="cloze-submit">送出</button>`;
-    opts.appendChild(row);
-    const input = row.querySelector("input");
-    const submit = () => {
-      if (input.disabled || !input.value.trim()) return;
-      const ok = input.value.trim().toLowerCase() === ans.toLowerCase();
-      input.disabled = true;
-      input.classList.add(ok ? "correct" : "wrong");
-      answerQuestion(null, ok, q);
-    };
-    row.querySelector("button").addEventListener("click", submit);
-    input.addEventListener("keydown", e => {
-      if (e.key !== "Enter") return;
-      e.preventDefault();
-      submit();
-    });
-    setTimeout(() => input.focus(), 50);
   } else {
-    qEl.innerHTML = `<div class="dragon-qtype">🎧 聽力題：聽發音，選出正確意思</div>`;
-    const btns = document.createElement("div");
-    btns.className = "dragon-listen-btns";
-    btns.innerHTML = `<button>🔊 再聽一次</button><button>🐢 慢速</button>`;
-    btns.children[0].addEventListener("click", e => { e.stopPropagation(); speak(q.word, 0.9); });
-    btns.children[1].addEventListener("click", e => { e.stopPropagation(); speak(q.word, 0.5); });
-    qEl.appendChild(btns);
-    let wrongs = shuffle(wordsPool.filter(w => w.meaning !== q.meaning)).slice(0, 3);
-    if (sorcererLv) {
-      const removeCount = Math.min(sorcererLv, wrongs.length);
-      wrongs = wrongs.slice(0, wrongs.length - removeCount);
-      showBattleEffect(`🪄魔法消除${removeCount}個選項`, "#a29bfe");
-    }
-    shuffle([q, ...wrongs]).forEach(opt => {
-      const b = document.createElement("button");
-      b.textContent = opt.meaning;
-      b.addEventListener("click", () => answerQuestion(b, opt.id === q.id, q));
-      opts.appendChild(b);
-    });
-    setTimeout(() => speak(q.word, 0.9), 300);
+    html += `<div class="cloze-sentence"><span class="cloze-blank">${escapeHtml(hint)}</span></div>`;
   }
+  qEl.innerHTML = html;
+  const btns = document.createElement("div");
+  btns.className = "dragon-listen-btns";
+  btns.innerHTML = `<button>🔊 發音</button><button>🐢 慢速</button>`;
+  btns.children[0].addEventListener("click", e => { e.stopPropagation(); speak(ans, 0.9); });
+  btns.children[1].addEventListener("click", e => { e.stopPropagation(); speak(ans, 0.5); });
+  qEl.appendChild(btns);
+
+  const row = document.createElement("div");
+  row.className = "cloze-input-row";
+  row.innerHTML = `<input type="text" id="cloze-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="輸入英文單字"><button id="cloze-submit">送出</button>`;
+  opts.appendChild(row);
+  const input = row.querySelector("input");
+  // 填空題的變化形（例如 animals）也接受原形 animal
+  const accepted = new Set([ans.toLowerCase(), q.word.toLowerCase()]);
+  const submit = () => {
+    if (input.disabled || !input.value.trim()) return;
+    const ok = accepted.has(input.value.trim().toLowerCase().replace(/\s+/g, " "));
+    input.disabled = true;
+    input.classList.add(ok ? "correct" : "wrong");
+    answerQuestion(null, ok, q);
+  };
+  row.querySelector("button").addEventListener("click", submit);
+  input.addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    submit();
+  });
+  setTimeout(() => input.focus(), 50);
+  setTimeout(() => speak(ans, 0.9), 300);
 
   document.getElementById("quiz-feedback").classList.add("hidden");
   document.getElementById("next-question").classList.add("hidden");
@@ -824,7 +822,7 @@ function renderDragonQuestion(q) {
 function getQuizAnswerText(q) {
   if (state.quiz.range === "all") {
     const dq = state.quiz.dragonQ || {};
-    return dq.type === "cloze" ? `${dq.answer}（${q.meaning}）` : `${q.word}（${q.meaning}）`;
+    return `${dq.answer || q.word}（${q.meaning}）`;
   }
   return state.quiz.mode === "en-to-zh" ? q.meaning : q.word;
 }
@@ -1303,7 +1301,7 @@ function getWeaponTypeData(key) {
 }
 const CRITICAL_MS = 10000;
 function getCriticalMs() {
-  if (state.quiz && state.quiz.range === "all" && state.quiz.dragonQ?.type === "cloze") return 20000;
+  if (state.quiz && state.quiz.range === "all") return 20000;
   return (state.quiz && state.quiz.range === "learned") ? 5000 : CRITICAL_MS;
 }
 
