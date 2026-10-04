@@ -609,16 +609,9 @@ function buildAllPoolQuestions(count) {
   const learnedSet = new Set(progress.learnedIds || []);
   const unlearned = shuffle(wordsPool.filter(w => !learnedSet.has(w.id)));
   const learned   = shuffle(wordsPool.filter(w =>  learnedSet.has(w.id)));
-  // 未熟記佔 80%（20題），已熟記佔 20%（5題）
-  const learnedSlots   = Math.min(Math.floor(count * 0.2), learned.length);
-  const unlearnedSlots = Math.min(count - learnedSlots, unlearned.length);
-  const selected = [...unlearned.slice(0, unlearnedSlots), ...learned.slice(0, learnedSlots)];
-  // 若仍不足 25 題，從剩餘字補齊
-  if (selected.length < count) {
-    const usedIds = new Set(selected.map(w => w.id));
-    const extras  = shuffle(wordsPool.filter(w => !usedIds.has(w.id)));
-    selected.push(...extras.slice(0, count - selected.length));
-  }
+  // 全部從已熟記（學習過）的字出題；已熟記不足 25 字時才用未熟記字補齊
+  const selected = [...learned.slice(0, count)];
+  if (selected.length < count) selected.push(...unlearned.slice(0, count - selected.length));
   return shuffle(selected);
 }
 
