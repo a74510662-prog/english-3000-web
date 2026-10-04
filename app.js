@@ -130,6 +130,7 @@ function selectUser(name) {
   STORAGE_KEY = `english3000_progress_${name}`;
   localStorage.setItem(CURRENT_USER_KEY, name);
   progress = loadProgress();
+  checkClassUnlocks(); // 補解鎖：舊版購買巨龍神劍後沒有立即解鎖龍裔
   document.getElementById("user-picker-overlay").classList.add("hidden");
   document.getElementById("current-user-name").textContent = name;
   checkDailyLogin();
@@ -1284,6 +1285,9 @@ const STAGE_WEAPON_POOLS = [
 ];
 const WEAPON_STAGE_ATK = [1, 3, 5, 7];
 
+// 巨龍神劍：熟記字數達門檻後，用彩虹券在商店購買
+const DRAGON_SWORD_WORDS = 1500;
+const DRAGON_SWORD_COST = 100;
 // null = 商店購買（彩虹券），數字 = 需熟記單字數
 const WEAPON_UNLOCK_WORDS = {
   dagger: 0, bow: 0, staff: 0,
@@ -2523,7 +2527,7 @@ function buyItem(item, cost) {
   // 彩虹券商品
   if (item === "dragon_sword") {
     const learned = (progress.learnedIds || []).length;
-    if (learned < 1500) { alert(`需熟記 1500 字才能購買巨龍神劍！目前 ${learned}/1500`); return; }
+    if (learned < DRAGON_SWORD_WORDS) { alert(`需熟記 ${DRAGON_SWORD_WORDS} 字才能購買巨龍神劍！目前 ${learned}/${DRAGON_SWORD_WORDS}`); return; }
     const tickets = progress.char.rainbowTickets || 0;
     const inv = progress.char.weaponInventory || [];
     const existing = inv.find(x => x.type === "dragon_sword");
@@ -2534,8 +2538,9 @@ function buyItem(item, cost) {
     if (!progress.char.equippedWeapon) progress.char.equippedWeapon = "dragon_sword";
     progress.char.weaponInventory = inv;
     saveProgress(progress);
+    checkClassUnlocks();
     renderShop();
-    showChestModal("🐉", `獲得 巨龍神劍！<br><span style="font-size:0.85rem;color:#ffd700">傳說武器・基礎攻擊 20・不可升階</span>`);
+    showChestModal("🐉", `獲得 巨龍神劍！<br><span style="font-size:0.85rem;color:#ffd700">傳說武器・基礎攻擊 19・不可升階<br>🐉 龍裔職業已解鎖</span>`);
     return;
   }
   const coins = progress.char.coins || 0;
@@ -2945,7 +2950,9 @@ function renderWeaponInventory() {
       // 未擁有：鎖定顯示
       const req = WEAPON_UNLOCK_WORDS[wt.key];
       const unlockHint = req === null
-        ? "商店・🌈 彩虹券 ×1"
+        ? (learnedCount >= DRAGON_SWORD_WORDS
+            ? `熟記已達 ${DRAGON_SWORD_WORDS} 字・商店 🌈${DRAGON_SWORD_COST} 購買`
+            : `熟記 ${DRAGON_SWORD_WORDS} 字後可在商店 🌈${DRAGON_SWORD_COST} 購買（還差 ${DRAGON_SWORD_WORDS - learnedCount} 字）`)
         : req === 0
           ? "開寶箱取得"
           : learnedCount >= req
